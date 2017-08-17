@@ -60,9 +60,11 @@ int main() {
 
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+            printf("Trying to swap...\n");
             eglSwapBuffers(
                 EGLState->eglDisplay,
                 Display->surface);
+            printf("Swapped!\n");
         }
     }
 
