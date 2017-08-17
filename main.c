@@ -18,12 +18,12 @@ static const int CameraHeight = 1080;
 static const int CameraFPS = 30;
 
 int main() {
-    uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
-    int IsAsync = 1;
-    camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
-    if (CameraState == NULL) {
-        Fatal("Couldn't find a camera : (\n");
-    }
+    // uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
+    // int IsAsync = 0;
+    // camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
+    // if (CameraState == NULL) {
+    //     Fatal("Couldn't find a camera : (\n");
+    // }
 
     egl_state* EGLState = CreateEGLState();
 
@@ -39,8 +39,9 @@ int main() {
     GLuint CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
 
     while (1) {
-        camera_capture(CameraState, CameraBuffer);
-        UpdateTexture(CameraTexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
+
+        // camera_capture(CameraState, CameraBuffer);
+        // UpdateTexture(CameraTexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
 
         for (display* Display = EGLState->Displays; Display; Display = Display->next) {
             // Set the display's framebuffer as active
@@ -51,14 +52,19 @@ int main() {
 
             // Draw a texture to the display framebuffer
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glClearColor(1,0,0,1);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glUseProgram(FullscreenQuadProgram);
-            glBindVertexArray(FullscreenQuadVAO);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, CameraTexID);
+            glClearColor(
+                (sin(GetTime()*3)/2+0.5) * 0.8,
+                (sin(GetTime()*5)/2+0.5) * 0.8,
+                (sin(GetTime()*7)/2+0.5) * 0.8,
 
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                1);
+            glClear(GL_COLOR_BUFFER_BIT);
+            // glUseProgram(FullscreenQuadProgram);
+            // glBindVertexArray(FullscreenQuadVAO);
+            // glActiveTexture(GL_TEXTURE0);
+            // glBindTexture(GL_TEXTURE_2D, CameraTexID);
+
+            // glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
             printf("Trying to swap...\n");
             eglSwapBuffers(
@@ -66,6 +72,7 @@ int main() {
                 Display->surface);
             printf("Swapped!\n");
         }
+        usleep(20000);
     }
 
     return 0;
