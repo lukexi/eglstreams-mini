@@ -1,12 +1,9 @@
 INCLUDE_DIRS = -I/usr/include/libdrm -Isrc
-LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm
+LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm -lturbojpeg -lpthread
 
 SHADERS += $(wildcard shaders/*)
 HEADERS += $(wildcard src/*.h)
-SOURCES += src/egl-device.c
-SOURCES += src/egl-display.c
-SOURCES += src/egl-modeset.c
-SOURCES += src/utils.c
+SOURCES += $(wildcard src/*.c)
 OBJECTS += $(SOURCES:src/%.c=build/%.o)
 
 CFLAGS += -Wall
