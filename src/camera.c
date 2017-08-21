@@ -27,8 +27,8 @@ static void tick(char* str) {
     gettimeofday(&tv,NULL);
     uint64_t now = tv.tv_sec * (uint64_t)1000000 + tv.tv_usec;
     if (last_time != 0) {
-        uint64_t time_spent = now - last_time;
-        printf("%s: %lu us\n", str, time_spent);
+        // uint64_t time_spent = now - last_time;
+        // printf("%s: %lu us\n", str, time_spent);
     }
     last_time = now;
 }

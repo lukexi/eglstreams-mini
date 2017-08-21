@@ -14,23 +14,41 @@
 #include "shader.h"
 #include "quad.h"
 #include "texture.h"
+#include "mvar.h"
 
 static const int CameraChannels = 3;
 static const int CameraWidth = 1920;
 static const int CameraHeight = 1080;
 static const int CameraFPS = 30;
 
-int main() {
-
-
+void* CameraThreadMain(void* Args) {
+    mvar* CameraMVar = (mvar*)Args;
 
     // Camera setup
-    uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
-    int IsAsync = 0;
+    int IsAsync = 1;
     camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
     if (CameraState == NULL) {
         Fatal("Couldn't find a camera : (\n");
     }
+
+    while (1) {
+        uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
+        camera_capture(CameraState, CameraBuffer);
+        TryWriteMVar(CameraMVar, CameraBuffer);
+    }
+
+    return NULL;
+}
+
+
+
+int main() {
+    mvar* CameraMVar = CreateMVar(free);
+    pthread_t CameraThread;
+    int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
+    assert(!ResultCode);
+
+
 
     // EGL setup
     int NumDisplays;
@@ -46,8 +64,12 @@ int main() {
 
     while (1) {
 
-        camera_capture(CameraState, CameraBuffer);
-        UpdateTexture(CameraTexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
+        uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
+        if (CameraBuffer) {
+            UpdateTexture(CameraTexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
+            free(CameraBuffer);
+        }
+
 
         for (int D = 0; D < NumDisplays; D++) {
             egl_display* Display = &Displays[D];
