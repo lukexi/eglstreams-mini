@@ -13,7 +13,10 @@ CFLAGS += -g
 # Needed for creating .so files
 CFLAGS += -fPIC
 
-all: build/ egltest
+MAINS = $(wildcard ./*.c)
+APPS = $(MAINS:./%.c=./%.app)
+
+all: build/ $(APPS)
 
 build/:
 	mkdir -p build
@@ -23,9 +26,9 @@ build/:
 build/%.o: src/%.c $(HEADERS)
 	clang -c -o $@ $< $(CFLAGS) $(INCLUDE_DIRS)
 
-egltest: main.c $(OBJECTS)
+%.app: ./%.c $(OBJECTS)
 	clang -o $@ $^ $(CFLAGS) $(INCLUDE_DIRS) $(LIBS)
 
 clean:
 	rm -rf build/
-	rm -f egltest
+	rm -f *.app
