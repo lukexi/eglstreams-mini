@@ -394,6 +394,7 @@ egl_display* GetEglDisplays(
     kms_plane* Planes, int NumPlanes)
 {
     EGLBoolean ret;
+
     egl_display* Displays = malloc(sizeof(egl_display) * NumPlanes);
     for (int PlaneIndex = 0; PlaneIndex < NumPlanes; PlaneIndex++) {
         kms_plane* Plane = &Planes[PlaneIndex];
@@ -477,12 +478,13 @@ egl_display* GetEglDisplays(
          * Make current to the EGLSurface, so that OpenGL rendering is
          * directed to it.
          */
-        // EGLint contextAttribs[] = { EGL_NONE };
-        EGLContext DisplayContext = eglContext;
-        //     eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
-        // if (eglContext == NULL) {
-        //     Fatal("eglCreateContext() failed.\n");
-        // }
+        // EGLContext DisplayContext = eglContext;
+        EGLint contextAttribs[] = { EGL_NONE };
+        EGLContext DisplayContext =
+            eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
+        if (DisplayContext == NULL) {
+            Fatal("eglCreateContext() failed.\n");
+        }
 
         ret = eglMakeCurrent(eglDpy, eglSurface, eglSurface, DisplayContext);
 
@@ -495,6 +497,7 @@ egl_display* GetEglDisplays(
         Displays[PlaneIndex].DisplayDevice = eglDpy;
         Displays[PlaneIndex].Surface       = eglSurface;
         Displays[PlaneIndex].Context       = DisplayContext;
+        Displays[PlaneIndex].Config        = eglConfig;
     }
 
 
@@ -535,4 +538,57 @@ egl_display* SetupEGL(int* NumDisplays) {
     InitGLEW();
 
     return Displays;
+}
+
+
+void EGLCheck(const char* name) {
+    EGLint err = eglGetError();
+    if (err != EGL_SUCCESS) {
+        printf("%s: ", name);
+        switch (err) {
+            case EGL_NOT_INITIALIZED:
+                printf("EGL is not initialized, or could not be initialized, for the specified EGL display connection.\n");
+                break;
+            case EGL_BAD_ACCESS:
+                printf("EGL cannot access a requested resource (for example a context is bound in another thread).\n");
+                break;
+            case EGL_BAD_ALLOC:
+                printf("EGL failed to allocate resources for the requested operation.\n");
+                break;
+            case EGL_BAD_ATTRIBUTE:
+                printf("An unrecognized attribute or attribute value was passed in the attribute list.\n");
+                break;
+            case EGL_BAD_CONTEXT:
+                printf("An EGLContext argument does not name a valid EGL rendering context.\n");
+                break;
+            case EGL_BAD_CONFIG:
+                printf("An EGLConfig argument does not name a valid EGL frame buffer configuration.\n");
+                break;
+            case EGL_BAD_CURRENT_SURFACE:
+                printf("The current surface of the calling thread is a window, pixel buffer or pixmap that is no longer valid.\n");
+                break;
+            case EGL_BAD_DISPLAY:
+                printf("An EGLDisplay argument does not name a valid EGL display connection.\n");
+                break;
+            case EGL_BAD_SURFACE:
+                printf("An EGLSurface argument does not name a valid surface (window, pixel buffer or pixmap) configured for GL rendering.\n");
+                break;
+            case EGL_BAD_MATCH:
+                printf("Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface).\n");
+                break;
+            case EGL_BAD_PARAMETER:
+                printf("One or more argument values are invalid.\n");
+                break;
+            case EGL_BAD_NATIVE_PIXMAP:
+                printf("A NativePixmapType argument does not refer to a valid native pixmap.\n");
+                break;
+            case EGL_BAD_NATIVE_WINDOW:
+                printf("A NativeWindowType argument does not refer to a valid native window.\n");
+                break;
+            case EGL_CONTEXT_LOST:
+                printf("A power management event has occurred. The application must destroy all contexts and reinitialise OpenGL ES state and objects to continue rendering.\n");
+                break;
+        }
+        exit(1);
+    }
 }

@@ -33,6 +33,7 @@ typedef struct {
     EGLSurface Surface;
     EGLContext Context;
     EGLDisplay DisplayDevice;
+    EGLConfig Config;
 } egl_display;
 
 // One call to do all of the below
@@ -56,5 +57,9 @@ egl_display* GetEglDisplays(
     int NumPlanes);
 
 void InitGLEW();
+
+void GetEglExtensionFunctionPointers(void);
+
+void EGLCheck(const char* name);
 
 #endif /* EGL_H */
