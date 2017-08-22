@@ -5,6 +5,7 @@ SHADERS += $(wildcard shaders/*)
 HEADERS += $(wildcard src/*.h)
 SOURCES += $(wildcard src/*.c)
 OBJECTS += $(SOURCES:src/%.c=build/%.o)
+DEPENDS := $(SOURCES:src/%.c=build/%.d)
 
 CFLAGS += -Wall
 # CFLAGS += -O3
@@ -18,13 +19,15 @@ APPS = $(MAINS:./%.c=./%.app)
 
 all: build/ $(APPS)
 
+-include $(DEPENDS)
+
 build/:
 	mkdir -p build
 
 # Build each c file into a .o in the build dir
 # (this caches them for faster rebuilds)
 build/%.o: src/%.c $(HEADERS)
-	clang -c -o $@ $< $(CFLAGS) $(INCLUDE_DIRS)
+	clang -MMD -c -o $@ $< $(CFLAGS) $(INCLUDE_DIRS)
 
 %.app: ./%.c $(OBJECTS)
 	clang -o $@ $^ $(CFLAGS) $(INCLUDE_DIRS) $(LIBS)

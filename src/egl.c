@@ -393,6 +393,7 @@ egl_display* GetEglDisplays(
     EGLContext eglContext,
     kms_plane* Planes, int NumPlanes)
 {
+
     EGLBoolean ret;
 
     egl_display* Displays = malloc(sizeof(egl_display) * NumPlanes);
@@ -479,6 +480,7 @@ egl_display* GetEglDisplays(
          * directed to it.
          */
         // EGLContext DisplayContext = eglContext;
+
         EGLint contextAttribs[] = { EGL_NONE };
         EGLContext DisplayContext =
             eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
@@ -486,11 +488,11 @@ egl_display* GetEglDisplays(
             Fatal("eglCreateContext() failed.\n");
         }
 
-        ret = eglMakeCurrent(eglDpy, eglSurface, eglSurface, DisplayContext);
+        // ret = eglMakeCurrent(eglDpy, eglSurface, eglSurface, DisplayContext);
 
-        if (!ret) {
-            Fatal("Unable to make context and surface current.\n");
-        }
+        // if (!ret) {
+        //     Fatal("Unable to make context and surface current.\n");
+        // }
 
         Displays[PlaneIndex].EDID          = Plane->EDID;
         Displays[PlaneIndex].Width         = Plane->Width;
@@ -529,6 +531,7 @@ egl_display* SetupEGL(int* NumDisplays) {
     EGLConfig  eglConfig  = GetEglConfig(eglDpy);
     EGLContext eglContext = GetEglContext(eglDpy, eglConfig);
 
+    InitGLEW();
 
     // Set up EGL state for each connected display
     int NumPlanes;
@@ -536,7 +539,10 @@ egl_display* SetupEGL(int* NumDisplays) {
     *NumDisplays = NumPlanes;
     egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, eglContext, Planes, NumPlanes);
 
-    InitGLEW();
+    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, eglContext);
+    if (!ret) {
+        Fatal("Couldn't make main context current\n");
+    }
 
     return Displays;
 }

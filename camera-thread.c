@@ -43,16 +43,29 @@ void* CameraThreadMain(void* Args) {
 
 
 int main() {
-    mvar* CameraMVar = CreateMVar(free);
-    pthread_t CameraThread;
-    int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
-    assert(!ResultCode);
 
+    // Setup global EGL device state
+    GetEglExtensionFunctionPointers();
 
+    EGLDeviceEXT eglDevice = GetEglDevice();
 
-    // EGL setup
+    int drmFd = GetDrmFd(eglDevice);
+
+    EGLDisplay eglDpy      = GetEglDisplay(eglDevice, drmFd);
+    EGLConfig  eglConfig   = GetEglConfig(eglDpy);
+    EGLContext RootContext = GetEglContext(eglDpy, eglConfig);
+
+    InitGLEW();
+
+    // Set up EGL state for each connected display
     int NumDisplays;
-    egl_display* Displays = SetupEGL(&NumDisplays);
+    kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
+    egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
+
+    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, Displays->Context);
+    if (!ret) {
+        Fatal("Couldn't make main context current\n");
+    }
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
@@ -61,6 +74,13 @@ int main() {
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
     GLuint CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
+
+
+    // Start up camera
+    mvar* CameraMVar = CreateMVar(free);
+    pthread_t CameraThread;
+    int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
+    assert(!ResultCode);
 
     while (1) {
 

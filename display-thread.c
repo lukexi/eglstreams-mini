@@ -112,26 +112,29 @@ int main() {
 
     EGLDisplay eglDisplayDevice = GetEglDisplay(eglDevice, drmFd);
     EGLConfig  eglConfig        = GetEglConfig(eglDisplayDevice);
-    EGLContext eglContext       = GetEglContext(eglDisplayDevice, eglConfig);
-    EGLBoolean ret = eglMakeCurrent(
-        eglDisplayDevice,
-        EGL_NO_SURFACE, EGL_NO_SURFACE,
-        eglContext);
+    EGLContext RootContext      = GetEglContext(eglDisplayDevice, eglConfig);
+    EGLBoolean ret = eglMakeCurrent(eglDisplayDevice, EGL_NO_SURFACE, EGL_NO_SURFACE, RootContext);
     assert(ret);
     InitGLEW();
+
+
 
     // Set up EGL state for each connected display
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
 
-    egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, eglContext, Planes, NumDisplays);
+    // Displays share root context
+    egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
 
+    // NumDisplays = 1; printf("Forcing number of displays to 1\n");
+
+    // Camera shares root context
     EGLint contextAttribs[] = { EGL_NONE };
     EGLContext CameraThreadContext =
         eglCreateContext(
             eglDisplayDevice,
             eglConfig,
-            eglContext,
+            RootContext,
             contextAttribs);
 
     // Set up global resources
