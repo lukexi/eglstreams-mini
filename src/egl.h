@@ -28,6 +28,7 @@
 #include "kms.h"
 
 typedef struct {
+    drm_edid* EDID;
     int Width;
     int Height;
     EGLSurface Surface;

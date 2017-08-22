@@ -54,30 +54,17 @@ void* CameraThreadMain(void* Args) {
     while (1) {
         camera_capture(CameraState, CameraBuffer);
         UpdateTexture(CameraThreadState->TexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
-        glFinish();
+        glFlush();
+        GLCheck("Camera Thread");
     }
 
     return NULL;
 }
 
-/*
-Root
-    Camera
-    Display1
-    Display2
-Doesn't work.
-
-Root
-    Display1
-        Camera
-    Display2
-Works
-
-*/
-
 void* DisplayThreadMain(void* ThreadArguments) {
-    printf("Starting display %p\n", ThreadArguments);
     egl_display* Display = (egl_display*)ThreadArguments;
+    char* DisplayName = Display->EDID->MonitorName;
+    printf("Starting display %s\n", DisplayName);
     // Set the display's framebuffer as active
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
@@ -88,12 +75,12 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     while (1) {
-        printf("Drawing %p\n", ThreadArguments);
+        printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
         glClearColor(
-            (sin(GetTime()*3)/2+0.5) * 0.8,
-            (sin(GetTime()*5)/2+0.5) * 0.8,
-            (sin(GetTime()*7)/2+0.5) * 0.8,
+            1,
+            1,
+            1,
             1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
@@ -101,10 +88,15 @@ void* DisplayThreadMain(void* ThreadArguments) {
         glBindTexture(GL_TEXTURE_2D, CameraTexID);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+        char Pixel[3];
+        glReadPixels(0,0,1,1,GL_RGB,GL_UNSIGNED_BYTE,&Pixel);
+        printf("Pixel %s: %i %i %i\n", DisplayName, Pixel[0],Pixel[1],Pixel[2]);
+
         eglSwapBuffers(
             Display->DisplayDevice,
             Display->Surface);
-        usleep(10000);
+        usleep(16600);
+        GLCheck("Display Thread");
     }
 }
 
@@ -142,9 +134,14 @@ int main() {
             eglContext,
             contextAttribs);
 
+    // Set up global resources
     CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
+    FullscreenQuadProgram = CreateVertFragProgramFromPath(
+        "shaders/basic.vert",
+        "shaders/textured.frag"
+        );
 
-
+    // Launch camera thread
     camera_thread_state* CameraThreadState = malloc(sizeof(camera_thread_state));
     CameraThreadState->MVar                = CreateMVar(free);
     CameraThreadState->Context             = CameraThreadContext;
@@ -154,17 +151,15 @@ int main() {
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraThreadState);
     assert(!ResultCode);
 
-    FullscreenQuadProgram = CreateVertFragProgramFromPath(
-        "shaders/basic.vert",
-        "shaders/textured.frag"
-        );
 
+    // Launch display threads
     for (int D = 0; D < NumDisplays; D++) {
         egl_display* Display = &Displays[D];
         pthread_t DisplayThread;
         int ResultCode = pthread_create(&DisplayThread, NULL, DisplayThreadMain, Display);
         assert(!ResultCode);
     }
+    GLCheck("Hello");
 
     pthread_join(CameraThread, NULL);
 

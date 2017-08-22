@@ -492,6 +492,7 @@ egl_display* GetEglDisplays(
             Fatal("Unable to make context and surface current.\n");
         }
 
+        Displays[PlaneIndex].EDID          = Plane->EDID;
         Displays[PlaneIndex].Width         = Plane->Width;
         Displays[PlaneIndex].Height        = Plane->Height;
         Displays[PlaneIndex].DisplayDevice = eglDpy;
