@@ -125,6 +125,7 @@ int main() {
         eglDisplayDevice,
         EGL_NO_SURFACE, EGL_NO_SURFACE,
         eglContext);
+    assert(ret);
     InitGLEW();
 
     // Set up EGL state for each connected display
@@ -165,7 +166,7 @@ int main() {
         assert(!ResultCode);
     }
 
-    pthread_join(&CameraThread, NULL);
+    pthread_join(CameraThread, NULL);
 
     return 0;
 }
