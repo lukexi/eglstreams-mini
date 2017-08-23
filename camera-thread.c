@@ -44,37 +44,19 @@ void* CameraThreadMain(void* Args) {
 
 int main() {
 
-    // Setup global EGL device state
-    GetEglExtensionFunctionPointers();
-
-    EGLDeviceEXT eglDevice = GetEglDevice();
-
-    int drmFd = GetDrmFd(eglDevice);
-
-    EGLDisplay eglDpy      = GetEglDisplay(eglDevice, drmFd);
-    EGLConfig  eglConfig   = GetEglConfig(eglDpy);
-    EGLContext RootContext = GetEglContext(eglDpy, eglConfig);
-
-    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, RootContext);
-    if (!ret) Fatal("Couldn't make main context current\n");
-
-    InitGLEW();
-
-    // Set up EGL state for each connected display
-    int NumDisplays;
-    kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-    egl_display* Displays = SetupEGLDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
+    egl_state* EGL = SetupEGL();
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
         "shaders/textured.frag"
         );
 
-    GLuint* VAOs = malloc(sizeof(GLuint) * NumDisplays);
-    for (int D = 0; D < NumDisplays; D++) {
-        egl_display* Display = &Displays[D];
+    GLuint* VAOs = malloc(sizeof(GLuint) * EGL->DisplaysCount);
+    for (int D = 0; D < EGL->DisplaysCount; D++) {
+        egl_display* Display = &EGL->Displays[D];
         // Set the display's framebuffer as active
-        eglMakeCurrent(Display->DisplayDevice,
+        eglMakeCurrent(
+            Display->DisplayDevice,
             Display->Surface, Display->Surface,
             Display->Context);
         GLuint FullscreenQuadVAO = CreateFullscreenQuad();
@@ -99,10 +81,11 @@ int main() {
         }
 
 
-        for (int D = 0; D < NumDisplays; D++) {
-            egl_display* Display = &Displays[D];
+        for (int D = 0; D < EGL->DisplaysCount; D++) {
+            egl_display* Display = &EGL->Displays[D];
             // Set the display's framebuffer as active
-            eglMakeCurrent(Display->DisplayDevice,
+            eglMakeCurrent(
+                Display->DisplayDevice,
                 Display->Surface, Display->Surface,
                 Display->Context);
             glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
