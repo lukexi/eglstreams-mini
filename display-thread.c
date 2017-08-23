@@ -78,7 +78,7 @@ int main() {
     // Set up EGL state for each connected display
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-    egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
+    egl_display* Displays = SetupEGLDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
 
     // Launch display threads
     pthread_t DisplayThread; // Hold onto the last thread so we can join on it

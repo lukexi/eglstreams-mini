@@ -63,7 +63,7 @@ int main() {
     // Set up EGL state for each connected display
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-    egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
+    egl_display* Displays = SetupEGLDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",

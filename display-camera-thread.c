@@ -96,22 +96,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 }
 
 int main() {
-    GetTime();
-    // EGL setup
-    // Setup global EGL device state
-    GetEglExtensionFunctionPointers();
-
-    EGLDeviceEXT eglDevice = GetEglDevice();
-
-    int drmFd = GetDrmFd(eglDevice);
-
-    EGLDisplay eglDisplayDevice = GetEglDisplay(eglDevice, drmFd);
-    EGLConfig  eglConfig        = GetEglConfig(eglDisplayDevice);
-    EGLContext RootContext      = GetEglContext(eglDisplayDevice, eglConfig);
-    EGLBoolean ret = eglMakeCurrent(eglDisplayDevice, EGL_NO_SURFACE, EGL_NO_SURFACE, RootContext);
-    if (!ret) Fatal("Couldn't make main context current\n");
-
-    InitGLEW();
+    egl_state* EGL = SetupEGL();
 
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
@@ -121,28 +106,22 @@ int main() {
     CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
 
 
-    // Set up EGL state for each connected display
-    int NumDisplays;
-    kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-    egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
-
     // NumDisplays = 1; printf("Forcing number of displays to 1\n");
 
     // Camera shares root context
-    EGLint contextAttribs[] = { EGL_NONE };
-    EGLContext CameraThreadContext =
-        eglCreateContext(
-            eglDisplayDevice,
-            eglConfig,
-            RootContext,
-            contextAttribs);
+    EGLint ContextAttribs[] = { EGL_NONE };
+    EGLContext CameraThreadContext = eglCreateContext(
+        EGL->DisplayDevice,
+        EGL->Config,
+        EGL->RootContext,
+        ContextAttribs);
 
 
     // Launch camera thread
     camera_thread_state* CameraThreadState = malloc(sizeof(camera_thread_state));
     CameraThreadState->MVar                = CreateMVar(free);
     CameraThreadState->Context             = CameraThreadContext;
-    CameraThreadState->DisplayDevice       = eglDisplayDevice;
+    CameraThreadState->DisplayDevice       = EGL->DisplayDevice;
     CameraThreadState->TexID               = CameraTexID;
     pthread_t CameraThread;
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraThreadState);
@@ -150,8 +129,8 @@ int main() {
 
 
     // Launch display threads
-    for (int D = 0; D < NumDisplays; D++) {
-        egl_display* Display = &Displays[D];
+    for (int D = 0; D < EGL->DisplaysCount; D++) {
+        egl_display* Display = &EGL->Displays[D];
         pthread_t DisplayThread;
         int ResultCode = pthread_create(&DisplayThread, NULL, DisplayThreadMain, Display);
         assert(!ResultCode);

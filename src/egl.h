@@ -37,8 +37,19 @@ typedef struct {
     EGLConfig Config;
 } egl_display;
 
+typedef struct {
+    egl_display* Displays;
+    int DisplaysCount;
+    EGLContext RootContext;
+    EGLDisplay DisplayDevice;
+    EGLDeviceEXT Device;
+    EGLConfig Config;
+} egl_state;
+
+
+
 // One call to do all of the below
-egl_display* SetupEGL(int* NumDisplays);
+egl_state* SetupEGL();
 
 // Components of SetupEGL
 EGLDeviceEXT GetEglDevice(void);
@@ -50,7 +61,7 @@ EGLDisplay GetEglDisplay(EGLDeviceEXT device, int drmFd);
 EGLConfig GetEglConfig(EGLDisplay eglDpy);
 EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig);
 
-egl_display* GetEglDisplays(
+egl_display* SetupEGLDisplays(
     EGLDisplay eglDpy,
     EGLConfig eglConfig,
     EGLContext eglContext,

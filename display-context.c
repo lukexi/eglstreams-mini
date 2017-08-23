@@ -44,7 +44,7 @@ int main() {
     // Set up EGL state for each connected display
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-    egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
+    egl_display* Displays = SetupEGLDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
 
     // Create a VAO for each display, since those aren't shared
     // (c.f. "Container objects")

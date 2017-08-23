@@ -388,7 +388,7 @@ EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig) {
 /*
  * Set up EGL to present to a DRM KMS plane through an EGLStream.
  */
-egl_display* GetEglDisplays(
+egl_display* SetupEGLDisplays(
     EGLDisplay eglDpy,
     EGLConfig eglConfig,
     EGLContext eglContext,
@@ -520,32 +520,30 @@ void InitGLEW() {
     }
 }
 
-egl_display* SetupEGL(int* NumDisplays) {
-    // Setup global EGL device state
+egl_state* SetupEGL() {
+    egl_state* EGL = malloc(sizeof(egl_state));
+
+    // Setup global EGL state
     GetEglExtensionFunctionPointers();
 
-    EGLDeviceEXT eglDevice = GetEglDevice();
+    EGL->Device = GetEglDevice();
 
-    int drmFd = GetDrmFd(eglDevice);
+    int drmFd = GetDrmFd(EGL->Device);
 
-    EGLDisplay eglDpy     = GetEglDisplay(eglDevice, drmFd);
-    EGLConfig  eglConfig  = GetEglConfig(eglDpy);
-    EGLContext eglContext = GetEglContext(eglDpy, eglConfig);
+    EGL->DisplayDevice = GetEglDisplay(EGL->Device, drmFd);
+    EGL->Config        = GetEglConfig(EGL->DisplayDevice);
+    EGL->RootContext   = GetEglContext(EGL->DisplayDevice, EGL->Config);
+
+    EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
+    if (!ret) Fatal("Couldn't make main context current\n");
 
     InitGLEW();
 
     // Set up EGL state for each connected display
-    int NumPlanes;
-    kms_plane* Planes     = SetDisplayModes(drmFd, &NumPlanes);
-    *NumDisplays = NumPlanes;
-    egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, eglContext, Planes, NumPlanes);
+    kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
+    EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice, EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount);
 
-    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, eglContext);
-    if (!ret) {
-        Fatal("Couldn't make main context current\n");
-    }
-
-    return Displays;
+    return EGL;
 }
 
 
