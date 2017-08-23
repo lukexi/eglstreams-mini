@@ -51,7 +51,6 @@ void* DisplayThreadMain(void* ThreadArguments) {
 }
 
 int main() {
-    GetTime();
     // EGL setup
     // Setup global EGL device state
     GetEglExtensionFunctionPointers();
@@ -69,7 +68,6 @@ int main() {
 
     InitGLEW();
 
-
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
@@ -81,7 +79,6 @@ int main() {
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
     egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
-    printf("Num displays: %i\n", NumDisplays);
 
     // Launch display threads
     pthread_t DisplayThread; // Hold onto the last thread so we can join on it

@@ -88,14 +88,9 @@ void* DisplayThreadMain(void* ThreadArguments) {
         glBindTexture(GL_TEXTURE_2D, CameraTexID);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        char Pixel[3];
-        glReadPixels(0,0,1,1,GL_RGB,GL_UNSIGNED_BYTE,&Pixel);
-        printf("Pixel %s: %i %i %i\n", DisplayName, Pixel[0],Pixel[1],Pixel[2]);
-
         eglSwapBuffers(
             Display->DisplayDevice,
             Display->Surface);
-        usleep(16600);
         GLCheck("Display Thread");
     }
 }
@@ -114,16 +109,21 @@ int main() {
     EGLConfig  eglConfig        = GetEglConfig(eglDisplayDevice);
     EGLContext RootContext      = GetEglContext(eglDisplayDevice, eglConfig);
     EGLBoolean ret = eglMakeCurrent(eglDisplayDevice, EGL_NO_SURFACE, EGL_NO_SURFACE, RootContext);
-    assert(ret);
+    if (!ret) Fatal("Couldn't make main context current\n");
+
     InitGLEW();
 
+    // Set up global resources
+    FullscreenQuadProgram = CreateVertFragProgramFromPath(
+        "shaders/basic.vert",
+        "shaders/textured.frag"
+        );
+    CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
 
 
     // Set up EGL state for each connected display
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
-
-    // Displays share root context
     egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
 
     // NumDisplays = 1; printf("Forcing number of displays to 1\n");
@@ -137,12 +137,6 @@ int main() {
             RootContext,
             contextAttribs);
 
-    // Set up global resources
-    CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
-    FullscreenQuadProgram = CreateVertFragProgramFromPath(
-        "shaders/basic.vert",
-        "shaders/textured.frag"
-        );
 
     // Launch camera thread
     camera_thread_state* CameraThreadState = malloc(sizeof(camera_thread_state));
