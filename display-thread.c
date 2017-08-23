@@ -81,7 +81,7 @@ int main() {
     int NumDisplays;
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
     egl_display* Displays = GetEglDisplays(eglDisplayDevice, eglConfig, RootContext, Planes, NumDisplays);
-
+    printf("Num displays: %i\n", NumDisplays);
 
     // Launch display threads
     pthread_t DisplayThread; // Hold onto the last thread so we can join on it

@@ -196,7 +196,7 @@ EGLDeviceEXT GetEglDevice(void)
 
         if (ExtensionIsSupported(deviceExtensionString, "EGL_EXT_device_drm")) {
             device = devices[i];
-            break;
+            // break;
         }
     }
 
@@ -231,6 +231,7 @@ int GetDrmFd(EGLDeviceEXT device)
     if (drmDeviceFile == NULL) {
         Fatal("No DRM device file found for EGL device.\n");
     }
+    printf("Device file: %s\n", drmDeviceFile);
 
     fd = open(drmDeviceFile, O_RDWR, 0);
 

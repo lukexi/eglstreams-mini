@@ -584,6 +584,7 @@ kms_plane* SetDisplayModes(int drmFd, int *NumPlanes) {
     }
 
     kms_plane* Planes = malloc(sizeof(kms_plane) * pModeRes->count_connectors);
+    printf("Num connectors: %i\n", pModeRes->count_connectors);
     int PlaneIndex = 0;
     for (int connIndex = 0; connIndex < pModeRes->count_connectors; connIndex++) {
         struct Config config = { 0 };

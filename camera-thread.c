@@ -55,6 +55,9 @@ int main() {
     EGLConfig  eglConfig   = GetEglConfig(eglDpy);
     EGLContext RootContext = GetEglContext(eglDpy, eglConfig);
 
+    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, RootContext);
+    if (!ret) Fatal("Couldn't make main context current\n");
+
     InitGLEW();
 
     // Set up EGL state for each connected display
@@ -62,16 +65,21 @@ int main() {
     kms_plane* Planes     = SetDisplayModes(drmFd, &NumDisplays);
     egl_display* Displays = GetEglDisplays(eglDpy, eglConfig, RootContext, Planes, NumDisplays);
 
-    EGLBoolean ret = eglMakeCurrent(eglDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, Displays->Context);
-    if (!ret) {
-        Fatal("Couldn't make main context current\n");
-    }
-
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
         "shaders/textured.frag"
         );
-    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+
+    GLuint* VAOs = malloc(sizeof(GLuint) * NumDisplays);
+    for (int D = 0; D < NumDisplays; D++) {
+        egl_display* Display = &Displays[D];
+        // Set the display's framebuffer as active
+        eglMakeCurrent(Display->DisplayDevice,
+            Display->Surface, Display->Surface,
+            Display->Context);
+        GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+        VAOs[D] = FullscreenQuadVAO;
+    }
 
     GLuint CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
 
@@ -108,7 +116,7 @@ int main() {
                 1);
             glClear(GL_COLOR_BUFFER_BIT);
             glUseProgram(FullscreenQuadProgram);
-            glBindVertexArray(FullscreenQuadVAO);
+            glBindVertexArray(VAOs[D]);
             glBindTexture(GL_TEXTURE_2D, CameraTexID);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
