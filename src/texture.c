@@ -73,5 +73,5 @@ void UpdateTexture(GLuint Tex, int Width, int Height, GLenum Format, const void*
         ImageType,
         Data);
 
-    glGenerateTextureMipmap(Tex);
+    // glGenerateTextureMipmap(Tex);
 }

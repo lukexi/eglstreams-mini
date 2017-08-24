@@ -21,15 +21,17 @@ static const int CameraWidth = 1920;
 static const int CameraHeight = 1080;
 static const int CameraFPS = 30;
 
+#define NUM_TEXTURES 5
+
 typedef struct {
     EGLContext Context;
-    GLuint TexID;
+    GLuint TexIDs[NUM_TEXTURES];
     EGLDisplay DisplayDevice;
 } camera_thread_state;
 
 #define NEWTIME(name) float __name##Before = GetTime();
 #define ENDTIME(name) printf("Took: %.2fms\n", (GetTime() - __name##Before) * 1000);
-#define GRAPHTIME(name) Graph((GetTime() - __name##Before) * 1000);
+#define GRAPHTIME(name) printf("%s", #name); Graph((GetTime() - __name##Before) * 1000);
 
 void Graph(int N) {
     for (int i = 0; i < N; ++i) {
@@ -37,6 +39,8 @@ void Graph(int N) {
     }
     printf("\n");
 }
+
+int DrawIndex = 0;
 
 void* CameraThreadMain(void* Args) {
     camera_thread_state* CameraThreadState = (camera_thread_state*)Args;
@@ -50,6 +54,15 @@ void* CameraThreadMain(void* Args) {
         Fatal("Couldn't make thread context current\n");
     }
 
+    const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
+    const int TripleBufferSize = CameraBufferSize * NUM_TEXTURES; // Triple buffering
+
+    GLuint PBO;
+    glGenBuffers(1, &PBO);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
+    int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+    glBufferStorage(GL_PIXEL_UNPACK_BUFFER, TripleBufferSize, 0, Flags);
+    uint8_t* CameraBuffer = (uint8_t*)glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, TripleBufferSize, Flags);
 
     // Camera setup
     int IsAsync = 1;
@@ -58,21 +71,29 @@ void* CameraThreadMain(void* Args) {
         Fatal("Couldn't find a camera : (\n");
     }
 
-    uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
+    int BufferIndex = 0;
     while (1) {
-        camera_capture(CameraState, CameraBuffer);
+
+        size_t BufferOffset = CameraBufferSize * BufferIndex;
+
+        uint8_t* CurrentBuffer = CameraBuffer + BufferOffset;
+        camera_capture(CameraState, CurrentBuffer);
 
         NEWTIME(UpdateTexture);
         glTextureSubImage2D(
-            CameraThreadState->TexID,
+            CameraThreadState->TexIDs[BufferIndex],
             0,
             0, 0,
             CameraWidth, CameraHeight,
             GL_RGB,
             GL_UNSIGNED_BYTE,
-            CameraBuffer);
-        glFlush();
+            (void*)BufferOffset);
+        // glFlush();
         GRAPHTIME(UpdateTexture);
+        printf("Uploading into %i\n", BufferIndex);
+
+        BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
+        DrawIndex = BufferIndex;
     }
 
     return NULL;
@@ -102,7 +123,7 @@ int main() {
         VAOs[D] = FullscreenQuadVAO;
     }
 
-    GLuint CameraTexID = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
+
 
     // Launch camera thread
     EGLint ContextAttribs[] = { EGL_NONE };
@@ -114,7 +135,10 @@ int main() {
     camera_thread_state* CameraThreadState = malloc(sizeof(camera_thread_state));
     CameraThreadState->Context             = CameraThreadContext;
     CameraThreadState->DisplayDevice       = EGL->DisplayDevice;
-    CameraThreadState->TexID               = CameraTexID;
+
+    for (int i = 0; i < NUM_TEXTURES; i++) {
+        CameraThreadState->TexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
+    }
 
     pthread_t CameraThread;
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraThreadState);
@@ -141,8 +165,10 @@ int main() {
             glClear(GL_COLOR_BUFFER_BIT);
             glUseProgram(FullscreenQuadProgram);
             glBindVertexArray(VAOs[D]);
-            glBindTexture(GL_TEXTURE_2D, CameraTexID);
+            glBindTexture(GL_TEXTURE_2D, CameraThreadState->TexIDs[DrawIndex]);
+            printf("Drawing from %i\n", DrawIndex);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glBindTexture(GL_TEXTURE_2D, 0);
 
             eglSwapBuffers(
                 Display->DisplayDevice,
