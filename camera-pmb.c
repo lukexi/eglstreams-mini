@@ -16,7 +16,6 @@
 #include "texture.h"
 #include "mvar.h"
 
-GLuint FullscreenQuadProgram;
 
 
 static const int CameraChannels = 3;
@@ -24,13 +23,8 @@ static const int CameraWidth = 1920;
 static const int CameraHeight = 1080;
 static const int CameraFPS = 30;
 
-#define NUM_TEXTURES 4
+#define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
-
-typedef struct {
-    EGLContext Context;
-    EGLDisplay DisplayDevice;
-} camera_thread_state;
 
 #define NEWTIME(name) float __##name##Before = GetTime();
 #define ENDTIME(name) printf("Took: %.2fms\n", (GetTime() - __##name##Before) * 1000);
@@ -45,16 +39,28 @@ void Graph(char* sym, int N) {
 
 int DrawIndex = 0;
 
-void* CameraThreadMain(void* Args) {
-    camera_thread_state* CameraThreadState = (camera_thread_state*)Args;
 
-    EGLBoolean ret = eglMakeCurrent(
-        CameraThreadState->DisplayDevice,
-        EGL_NO_SURFACE, EGL_NO_SURFACE,
-        CameraThreadState->Context);
-    if (!ret) {
-        // EGLCheck("CameraThreadMain");
-        Fatal("Couldn't make thread context current\n");
+int main() {
+    GetTime();
+
+    egl_state* EGL = SetupEGL();
+
+    egl_display* Display = EGL->Displays;
+    eglMakeCurrent(Display->DisplayDevice,
+        Display->Surface, Display->Surface,
+        Display->Context);
+    eglSwapInterval(Display->DisplayDevice, 0);
+    glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
+
+    GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
+        "shaders/basic.vert",
+        "shaders/textured.frag"
+        );
+    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+
+
+    for (int i = 0; i < NUM_TEXTURES; i++) {
+        CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
     }
 
     const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
@@ -75,17 +81,22 @@ void* CameraThreadMain(void* Args) {
         Fatal("Couldn't find a camera : (\n");
     }
 
+
+
+
     int BufferIndex = 0;
     while (1) {
+        // Update camera
 
         size_t BufferOffset = CameraBufferSize * BufferIndex;
 
         uint8_t* CurrentBuffer = CameraBuffer + BufferOffset;
-        // NEWTIME(Capture);
+        NEWTIME(Capture);
         camera_capture(CameraState, CurrentBuffer);
-        // GRAPHTIME(Capture, "-");
+        GRAPHTIME(Capture, "-");
 
         NEWTIME(UpdateTexture);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
         glTextureSubImage2D(
             CameraTexIDs[BufferIndex],
             0,
@@ -94,34 +105,18 @@ void* CameraThreadMain(void* Args) {
             GL_RGB,
             GL_UNSIGNED_BYTE,
             (void*)BufferOffset);
-        // glFlush();
         GRAPHTIME(UpdateTexture, "*");
-        printf("Uploading into %i\n", BufferIndex);
 
         BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
-        DrawIndex = (BufferIndex + 4) % NUM_TEXTURES;
-    }
+        DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
+        printf(">%i %i>\n", BufferIndex, DrawIndex);
 
-    return NULL;
-}
+        // Draw
 
-
-void* DisplayThreadMain(void* ThreadArguments) {
-    egl_display* Display = (egl_display*)ThreadArguments;
-    char* DisplayName = Display->EDID->MonitorName;
-    printf("Starting display %s\n", DisplayName);
-    // Set the display's framebuffer as active
-    eglMakeCurrent(Display->DisplayDevice,
-        Display->Surface, Display->Surface,
-        Display->Context);
-    glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
-
-    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    while (1) {
         // printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
+
+        NEWTIME(Draw);
         glClearColor(
             1,
             1,
@@ -133,53 +128,15 @@ void* DisplayThreadMain(void* ThreadArguments) {
         glBindTexture(GL_TEXTURE_2D, CameraTexIDs[DrawIndex]);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glBindTexture(GL_TEXTURE_2D, 0);
+        GRAPHTIME(Draw, "/");
 
+        NEWTIME(Swap);
         eglSwapBuffers(
             Display->DisplayDevice,
             Display->Surface);
+        GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
     }
-}
-
-
-int main() {
-    GetTime();
-
-    egl_state* EGL = SetupEGL();
-
-    FullscreenQuadProgram = CreateVertFragProgramFromPath(
-        "shaders/basic.vert",
-        "shaders/textured.frag"
-        );
-
-    // Launch camera thread
-    EGLint ContextAttribs[] = { EGL_NONE };
-    EGLContext CameraThreadContext = eglCreateContext(
-        EGL->DisplayDevice,
-        EGL->Config,
-        EGL->RootContext,
-        ContextAttribs);
-    camera_thread_state* CameraThreadState = malloc(sizeof(camera_thread_state));
-    CameraThreadState->Context             = CameraThreadContext;
-    CameraThreadState->DisplayDevice       = EGL->DisplayDevice;
-
-    for (int i = 0; i < NUM_TEXTURES; i++) {
-        CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
-    }
-
-    pthread_t CameraThread;
-    int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraThreadState);
-    assert(!ResultCode);
-
-
-    for (int D = 0; D < EGL->DisplaysCount; D++) {
-        egl_display* Display = &EGL->Displays[D];
-        pthread_t DisplayThread;
-        int ResultCode = pthread_create(&DisplayThread, NULL, DisplayThreadMain, Display);
-        assert(!ResultCode);
-    }
-
-    pthread_join(CameraThread, NULL);
 
     return 0;
 }
