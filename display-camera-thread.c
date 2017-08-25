@@ -1,3 +1,10 @@
+/*
+Each display runs on its own thread
+Each camera  runs on its own thread
+Cameras write using synchronous uploads to a single texture
+*/
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -76,11 +83,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
     while (1) {
         printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
-        glClearColor(
-            1,
-            1,
-            1,
-            1);
+        glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);

@@ -21,4 +21,10 @@ void GLCheck(const char* name);
 
 int NextPowerOfTwo(int x);
 
+#define NEWTIME(name) float __##name##Before = GetTime();
+#define ENDTIME(name) printf("Took: %.2fms\n", (GetTime() - __##name##Before) * 1000);
+#define GRAPHTIME(name, sym) printf("%20s", #name); Graph(sym, (GetTime() - __##name##Before) * 1000);
+
+void Graph(char* sym, int N);
+
 #endif /* UTILS_H */

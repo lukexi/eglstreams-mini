@@ -1,3 +1,6 @@
+/*
+Each display runs on its own thread.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -29,15 +32,10 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     while (1) {
         printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
-        glClearColor(
-            1,
-            1,
-            1,
-            1);
+        glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);

@@ -22,6 +22,13 @@ void Fatal(const char *format, ...)
     exit(1);
 }
 
+void Graph(char* sym, int N) {
+    for (int i = 0; i < N; ++i) {
+        printf("%s", sym);
+    }
+    printf("\n");
+}
+
 float GetTime(void)
 {
     static struct timeval InitialTime = {0, 0};

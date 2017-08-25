@@ -27,17 +27,6 @@ typedef struct {
     EGLDisplay DisplayDevice;
 } camera_thread_state;
 
-#define NEWTIME(name) float __name##Before = GetTime();
-#define ENDTIME(name) printf("Took: %.2fms\n", (GetTime() - __name##Before) * 1000);
-#define GRAPHTIME(name) Graph((GetTime() - __name##Before) * 1000);
-
-void Graph(int N) {
-    for (int i = 0; i < N; ++i) {
-        printf("*");
-    }
-    printf("\n");
-}
-
 void* CameraThreadMain(void* Args) {
     camera_thread_state* CameraThreadState = (camera_thread_state*)Args;
 
@@ -72,7 +61,7 @@ void* CameraThreadMain(void* Args) {
             GL_UNSIGNED_BYTE,
             CameraBuffer);
         glFlush();
-        GRAPHTIME(UpdateTexture);
+        GRAPHTIME(UpdateTexture, "*");
     }
 
     return NULL;

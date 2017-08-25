@@ -1,3 +1,6 @@
+/*
+Each display uses its own OpenGL context
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>

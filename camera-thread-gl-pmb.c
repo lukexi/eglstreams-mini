@@ -32,17 +32,6 @@ typedef struct {
     EGLDisplay DisplayDevice;
 } camera_thread_state;
 
-#define NEWTIME(name) float __##name##Before = GetTime();
-#define ENDTIME(name) printf("Took: %.2fms\n", (GetTime() - __##name##Before) * 1000);
-#define GRAPHTIME(name, sym) printf("%s", #name); Graph(sym, (GetTime() - __##name##Before) * 1000);
-
-void Graph(char* sym, int N) {
-    for (int i = 0; i < N; ++i) {
-        printf("%s", sym);
-    }
-    printf("\n");
-}
-
 int DrawIndex = 0;
 
 void* CameraThreadMain(void* Args) {

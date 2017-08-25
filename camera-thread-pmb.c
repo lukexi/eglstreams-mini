@@ -26,7 +26,28 @@ static const int CameraFPS = 30;
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
 
+
 int DrawIndex = 0;
+
+
+void* CameraThreadMain(void* Args) {
+    mvar* CameraMVar = (mvar*)Args;
+
+    // Camera setup
+    int IsAsync = 1;
+    camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
+    if (CameraState == NULL) {
+        Fatal("Couldn't find a camera : (\n");
+    }
+
+    while (1) {
+        uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
+        camera_capture(CameraState, CameraBuffer);
+        TryWriteMVar(CameraMVar, CameraBuffer);
+    }
+
+    return NULL;
+}
 
 
 int main() {
@@ -61,43 +82,40 @@ int main() {
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
     // uint8_t* CameraBuffer = (uint8_t*)glMapNamedBuffer(PBO, Flags);
-    uint8_t* CameraBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
+    uint8_t* CameraPBOBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
 
     // Camera setup
-    int IsAsync = 1;
-    camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
-    if (CameraState == NULL) {
-        Fatal("Couldn't find a camera : (\n");
-    }
-
-
+    mvar* CameraMVar = CreateMVar(free);
+    pthread_t CameraThread;
+    int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
+    assert(!ResultCode);
 
 
     int BufferIndex = 0;
     while (1) {
         // Update camera
 
-        size_t BufferOffset = CameraBufferSize * BufferIndex;
+        uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
+        if (CameraBuffer) {
+            NEWTIME(UpdateTexture);
+            const size_t BufferOffset = CameraBufferSize * BufferIndex;
+            const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
+            memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
+            glTextureSubImage2D(
+                CameraTexIDs[BufferIndex],
+                0,
+                0, 0,
+                CameraWidth, CameraHeight,
+                GL_RGB,
+                GL_UNSIGNED_BYTE,
+                (void*)BufferOffset);
+            GRAPHTIME(UpdateTexture, "*");
 
-        uint8_t* CurrentBuffer = CameraBuffer + BufferOffset;
-        NEWTIME(Capture);
-        camera_capture(CameraState, CurrentBuffer);
-        GRAPHTIME(Capture, "-");
+            BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
+            DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
+        }
 
-        NEWTIME(UpdateTexture);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
-        glTextureSubImage2D(
-            CameraTexIDs[BufferIndex],
-            0,
-            0, 0,
-            CameraWidth, CameraHeight,
-            GL_RGB,
-            GL_UNSIGNED_BYTE,
-            (void*)BufferOffset);
-        GRAPHTIME(UpdateTexture, "*");
-
-        BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
-        DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
         printf(">%i %i>\n", BufferIndex, DrawIndex);
 
         // Draw
