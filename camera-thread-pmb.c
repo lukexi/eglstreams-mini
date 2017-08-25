@@ -25,10 +25,11 @@ static const int CameraFPS = 30;
 
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
-
+GLsync CameraSyncs[NUM_TEXTURES];
 
 int DrawIndex = 0;
 
+int WaitCount = 0;
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;
@@ -48,6 +49,25 @@ void* CameraThreadMain(void* Args) {
 
     return NULL;
 }
+
+void WaitBuffer(GLsync Sync) {
+    if (!Sync) {
+        return;
+    }
+    while (1) {
+        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
+        if (WaitResult == GL_ALREADY_SIGNALED ||
+            WaitResult == GL_CONDITION_SATISFIED)
+              return;
+        WaitCount++;
+    }
+}
+
+void LockBuffer(GLsync* Sync) {
+    glDeleteSync(*Sync);
+    *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+}
+
 
 
 int main() {
@@ -71,6 +91,7 @@ int main() {
 
     for (int i = 0; i < NUM_TEXTURES; i++) {
         CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
+        CameraSyncs[i] = NULL;
     }
 
     const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
@@ -81,7 +102,6 @@ int main() {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
-    // uint8_t* CameraBuffer = (uint8_t*)glMapNamedBuffer(PBO, Flags);
     uint8_t* CameraPBOBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
 
     // Camera setup
@@ -97,7 +117,9 @@ int main() {
 
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
         if (CameraBuffer) {
+
             NEWTIME(UpdateTexture);
+            WaitBuffer(CameraSyncs[BufferIndex]);
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
@@ -110,13 +132,14 @@ int main() {
                 GL_RGB,
                 GL_UNSIGNED_BYTE,
                 (void*)BufferOffset);
+            LockBuffer(&CameraSyncs[BufferIndex]);
             GRAPHTIME(UpdateTexture, "*");
 
             BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
             DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
         }
 
-        printf(">%i %i>\n", BufferIndex, DrawIndex);
+        // printf(">%i %i>\n", BufferIndex, DrawIndex);
 
         // Draw
 
@@ -143,6 +166,7 @@ int main() {
             Display->Surface);
         GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
+        if (WaitCount) printf("Have waited %i times\n", WaitCount);
     }
 
     return 0;
