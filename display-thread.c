@@ -32,6 +32,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
+    fps FPS = MakeFPS(Display->EDID->MonitorName);
     while (1) {
         printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
@@ -45,6 +46,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
             Display->DisplayDevice,
             Display->Surface);
         GLCheck("Display Thread");
+        TickFPS(&FPS);
     }
 }
 

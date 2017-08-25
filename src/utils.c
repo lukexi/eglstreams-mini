@@ -44,31 +44,29 @@ float GetTime(void)
     return (TimeSinceStart.tv_sec + (TimeSinceStart.tv_usec / 1000000.0));
 }
 
-
-void PrintFps(void)
-{
-    static int frames = 0;
-    static float startTime = -1;
-    float seconds, currentTime = GetTime();
-
-    if (startTime < 0) {
-        startTime = currentTime;
-    }
-
-    frames++;
-
-    seconds = currentTime - startTime;
-
-    if (seconds > 5.0) {
-        float fps = frames / seconds;
-        printf("%d frames in %3.1f seconds = %6.3f FPS\n",
-               frames, seconds, fps);
-        fflush(stdout);
-        startTime = currentTime;
-        frames = 0;
-    }
+fps MakeFPS(char* Name) {
+    struct timeval Now;
+    gettimeofday(&Now, NULL);
+    return (fps){
+        .Frames = 0,
+        .CurrentSecond = (int)Now.tv_sec,
+        .Name = Name
+    };
 }
 
+void TickFPS(fps* FPS) {
+    struct timeval Now;
+    gettimeofday(&Now, NULL);
+
+    FPS->Frames++;
+
+    int NowSecond = Now.tv_sec;
+    if (NowSecond > FPS->CurrentSecond) {
+        printf("%40s: %i FPS\n", FPS->Name, FPS->Frames);
+        FPS->Frames = 0;
+        FPS->CurrentSecond = NowSecond;
+    }
+}
 
 
 void GLCheck(const char* name) {

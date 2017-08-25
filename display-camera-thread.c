@@ -37,6 +37,9 @@ typedef struct {
     EGLDisplay DisplayDevice;
 } camera_thread_state;
 
+
+
+
 void* CameraThreadMain(void* Args) {
     camera_thread_state* CameraThreadState = (camera_thread_state*)Args;
 
@@ -57,11 +60,13 @@ void* CameraThreadMain(void* Args) {
     }
     uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
 
+    fps FPS = MakeFPS("Camera");
     while (1) {
         camera_capture(CameraState, CameraBuffer);
         UpdateTexture(CameraThreadState->TexID, CameraWidth, CameraHeight, GL_RGB, CameraBuffer);
         glFlush();
         GLCheck("Camera Thread");
+        TickFPS(&FPS);
     }
 
     return NULL;
@@ -79,9 +84,9 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    fps FPS = MakeFPS(Display->EDID->MonitorName);
     while (1) {
-        printf("Drawing %s\n", DisplayName);
+        // printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
         glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -94,6 +99,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
             Display->DisplayDevice,
             Display->Surface);
         GLCheck("Display Thread");
+        TickFPS(&FPS);
     }
 }
 

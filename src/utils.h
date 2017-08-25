@@ -14,8 +14,6 @@
 
 void Fatal(const char *format, ...);
 float GetTime(void);
-void PrintFps(void);
-
 
 void GLCheck(const char* name);
 
@@ -26,5 +24,15 @@ int NextPowerOfTwo(int x);
 #define GRAPHTIME(name, sym) printf("%20s", #name); Graph(sym, (GetTime() - __##name##Before) * 1000);
 
 void Graph(char* sym, int N);
+
+
+typedef struct {
+    int Frames;
+    int CurrentSecond;
+    char* Name;
+} fps;
+
+fps MakeFPS(char* Name);
+void TickFPS(fps* FPS);
 
 #endif /* UTILS_H */
