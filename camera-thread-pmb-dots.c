@@ -19,6 +19,8 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "camera.h"
 #include "shader.h"
 #include "quad.h"
+#include "dotdetector.h"
+#include "dotframe.h"
 #include "texture.h"
 #include "mvar.h"
 
@@ -29,11 +31,8 @@ static const int CameraFPS = 30;
 
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
-GLsync CameraSyncs[NUM_TEXTURES];
 
 int DrawIndex = 0;
-
-int WaitCount = 0;
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;
@@ -54,32 +53,13 @@ void* CameraThreadMain(void* Args) {
     return NULL;
 }
 
-void WaitBuffer(GLsync Sync) {
-    if (!Sync) {
-        return;
-    }
-    while (1) {
-        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
-        if (WaitResult == GL_ALREADY_SIGNALED ||
-            WaitResult == GL_CONDITION_SATISFIED)
-              return;
-        WaitCount++;
-    }
-}
-
-void LockBuffer(GLsync* Sync) {
-    glDeleteSync(*Sync);
-    *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-
 
 int main() {
     GetTime();
 
     egl_state* EGL = SetupEGL();
 
-    egl_display* Display = &EGL->Displays[1];
+    egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
         Display->Context);
@@ -95,7 +75,6 @@ int main() {
 
     for (int i = 0; i < NUM_TEXTURES; i++) {
         CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
-        CameraSyncs[i] = NULL;
     }
 
     const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
@@ -114,15 +93,17 @@ int main() {
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
     assert(!ResultCode);
 
+    dotdetector_state* DotDetector = InitializeDotDetector();
+    dot_t* Dots = malloc(MAX_DOTS * sizeof(dot_t));
+
     int BufferIndex = 0;
+    fps FPS = MakeFPS("Display Thread");
     while (1) {
 
         // Update camera
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
         if (CameraBuffer) {
-
             NEWTIME(UpdateTexture);
-            WaitBuffer(CameraSyncs[BufferIndex]);
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
@@ -135,13 +116,19 @@ int main() {
                 GL_RGB,
                 GL_UNSIGNED_BYTE,
                 (void*)BufferOffset);
-            LockBuffer(&CameraSyncs[BufferIndex]);
             GRAPHTIME(UpdateTexture, "*");
 
             BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
             DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
         }
 
+        NEWTIME(Detect);
+        int NumDots = DetectDots(DotDetector,
+                4, 12,
+                CameraTexIDs[DrawIndex], GL_RGBA8,
+                Dots);
+        GRAPHTIME(Detect, ".");
+        // printf("Got dots: %i\n", NumDots);
         // printf(">%i %i>\n", BufferIndex, DrawIndex);
 
         // Draw
@@ -156,13 +143,14 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, 0);
         GRAPHTIME(Draw, "/");
 
-        NEWTIME(Swap);
+        // NEWTIME(Swap);
         eglSwapBuffers(
             Display->DisplayDevice,
             Display->Surface);
-        GRAPHTIME(Swap, "+");
+        // GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
-        if (WaitCount) printf("Have waited %i times\n", WaitCount);
+
+        // TickFPS(&FPS);
     }
 
     return 0;

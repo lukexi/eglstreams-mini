@@ -22,6 +22,8 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "texture.h"
 #include "mvar.h"
 
+
+
 static const int CameraChannels = 3;
 static const int CameraWidth = 1920;
 static const int CameraHeight = 1080;
@@ -29,11 +31,10 @@ static const int CameraFPS = 30;
 
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
-GLsync CameraSyncs[NUM_TEXTURES];
+
 
 int DrawIndex = 0;
 
-int WaitCount = 0;
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;
@@ -54,22 +55,37 @@ void* CameraThreadMain(void* Args) {
     return NULL;
 }
 
-void WaitBuffer(GLsync Sync) {
-    if (!Sync) {
-        return;
-    }
-    while (1) {
-        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
-        if (WaitResult == GL_ALREADY_SIGNALED ||
-            WaitResult == GL_CONDITION_SATISFIED)
-              return;
-        WaitCount++;
-    }
-}
+GLuint FullscreenQuadProgram;
 
-void LockBuffer(GLsync* Sync) {
-    glDeleteSync(*Sync);
-    *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+void* DisplayThreadMain(void* ThreadArguments) {
+    egl_display* Display = (egl_display*)ThreadArguments;
+    char* DisplayName = Display->EDID->MonitorName;
+    printf("Starting display %s\n", DisplayName);
+    // Set the display's framebuffer as active
+    eglMakeCurrent(Display->DisplayDevice,
+        Display->Surface, Display->Surface,
+        Display->Context);
+    glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
+
+    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+
+    fps FPS = MakeFPS(Display->EDID->MonitorName);
+    while (1) {
+        // Draw a texture to the display framebuffer
+        glClearColor(1, 1, 1, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(FullscreenQuadProgram);
+        glBindTexture(GL_TEXTURE_2D, CameraTexIDs[DrawIndex]);
+        glBindVertexArray(FullscreenQuadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        eglSwapBuffers(
+            Display->DisplayDevice,
+            Display->Surface);
+        GLCheck("Display Thread");
+        TickFPS(&FPS);
+    }
 }
 
 
@@ -79,23 +95,19 @@ int main() {
 
     egl_state* EGL = SetupEGL();
 
-    egl_display* Display = &EGL->Displays[1];
-    eglMakeCurrent(Display->DisplayDevice,
-        Display->Surface, Display->Surface,
-        Display->Context);
-    eglSwapInterval(Display->DisplayDevice, 0);
-    glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
+    // egl_display* Display = &EGL->Displays[1];
+    // eglMakeCurrent(Display->DisplayDevice,
+    //     Display->Surface, Display->Surface,
+    //     Display->Context);
+    // eglSwapInterval(Display->DisplayDevice, 0);
 
-    GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
+    FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
         "shaders/textured.frag"
         );
-    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
-
 
     for (int i = 0; i < NUM_TEXTURES; i++) {
         CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
-        CameraSyncs[i] = NULL;
     }
 
     const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
@@ -106,6 +118,7 @@ int main() {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
+    // uint8_t* CameraBuffer = (uint8_t*)glMapNamedBuffer(PBO, Flags);
     uint8_t* CameraPBOBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
 
     // Camera setup
@@ -114,15 +127,20 @@ int main() {
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
     assert(!ResultCode);
 
+    pthread_t DisplayThread; // Hold onto the last thread so we can join on it
+    for (int D = 0; D < EGL->DisplaysCount; D++) {
+        egl_display* Display = &EGL->Displays[D];
+        int ResultCode = pthread_create(&DisplayThread, NULL, DisplayThreadMain, Display);
+        assert(!ResultCode);
+    }
+
     int BufferIndex = 0;
     while (1) {
-
         // Update camera
+
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
         if (CameraBuffer) {
-
             NEWTIME(UpdateTexture);
-            WaitBuffer(CameraSyncs[BufferIndex]);
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
@@ -135,7 +153,6 @@ int main() {
                 GL_RGB,
                 GL_UNSIGNED_BYTE,
                 (void*)BufferOffset);
-            LockBuffer(&CameraSyncs[BufferIndex]);
             GRAPHTIME(UpdateTexture, "*");
 
             BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
@@ -143,26 +160,6 @@ int main() {
         }
 
         // printf(">%i %i>\n", BufferIndex, DrawIndex);
-
-        // Draw
-
-        NEWTIME(Draw);
-        glClearColor(1, 1, 1, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(FullscreenQuadProgram);
-        glBindVertexArray(FullscreenQuadVAO);
-        glBindTexture(GL_TEXTURE_2D, CameraTexIDs[DrawIndex]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        GRAPHTIME(Draw, "/");
-
-        NEWTIME(Swap);
-        eglSwapBuffers(
-            Display->DisplayDevice,
-            Display->Surface);
-        GRAPHTIME(Swap, "+");
-        GLCheck("Display Thread");
-        if (WaitCount) printf("Have waited %i times\n", WaitCount);
     }
 
     return 0;
