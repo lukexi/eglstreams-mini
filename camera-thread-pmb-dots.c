@@ -107,6 +107,7 @@ int main() {
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
+            free(CameraBuffer);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
             glTextureSubImage2D(
                 CameraTexIDs[BufferIndex],
