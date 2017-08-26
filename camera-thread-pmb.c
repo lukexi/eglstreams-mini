@@ -1,3 +1,9 @@
+/*
+This runs the camera in a thread and passes buffers over to the main thread
+for copying into a persistent mapped buffer.
+The memcpy takes about 1ms, but this otherwise runs well.
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -16,8 +22,6 @@
 #include "texture.h"
 #include "mvar.h"
 
-
-
 static const int CameraChannels = 3;
 static const int CameraWidth = 1920;
 static const int CameraHeight = 1080;
@@ -26,9 +30,7 @@ static const int CameraFPS = 30;
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
 
-
 int DrawIndex = 0;
-
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;
@@ -81,7 +83,6 @@ int main() {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
-    // uint8_t* CameraBuffer = (uint8_t*)glMapNamedBuffer(PBO, Flags);
     uint8_t* CameraPBOBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
 
     // Camera setup
@@ -90,11 +91,10 @@ int main() {
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
     assert(!ResultCode);
 
-
     int BufferIndex = 0;
     while (1) {
-        // Update camera
 
+        // Update camera
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
         if (CameraBuffer) {
             NEWTIME(UpdateTexture);
@@ -120,15 +120,8 @@ int main() {
 
         // Draw
 
-        // printf("Drawing %s\n", DisplayName);
-        // Draw a texture to the display framebuffer
-
         NEWTIME(Draw);
-        glClearColor(
-            1,
-            1,
-            1,
-            1);
+        glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);

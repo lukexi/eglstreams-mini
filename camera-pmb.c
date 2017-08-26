@@ -1,3 +1,8 @@
+/*
+Single-threaded camera->persistent mapped pixel buffer->texture.
+Renders to one display only to avoid double vsync.
+This is very low latency and lovely, and serves as our target experience.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -106,11 +111,7 @@ int main() {
         // Draw a texture to the display framebuffer
 
         NEWTIME(Draw);
-        glClearColor(
-            1,
-            1,
-            1,
-            1);
+        glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);

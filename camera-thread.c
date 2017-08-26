@@ -1,3 +1,8 @@
+/*
+Runs the camera on its own thread, and displays on the main thread,
+with potential vsync blocking.
+(with 2 30hz monitors, it seems to run fine at locked 30fps)
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -72,6 +77,7 @@ int main() {
     int ResultCode = pthread_create(&CameraThread, NULL, CameraThreadMain, CameraMVar);
     assert(!ResultCode);
 
+    fps FPS = MakeFPS("Display Thread");
     while (1) {
 
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
@@ -107,6 +113,7 @@ int main() {
                 Display->DisplayDevice,
                 Display->Surface);
         }
+        TickFPS(&FPS);
     }
 
     return 0;

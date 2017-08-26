@@ -111,11 +111,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
     while (1) {
         // printf("Drawing %s\n", DisplayName);
         // Draw a texture to the display framebuffer
-        glClearColor(
-            1,
-            1,
-            1,
-            1);
+        glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);

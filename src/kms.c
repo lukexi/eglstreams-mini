@@ -415,7 +415,6 @@ static void AssignPropertyIDsOneType(int drmFd,
         if (pProperty == NULL) {
             Fatal("Unable to query property.\n");
         }
-
         for (j = 0; j < tableLen; j++) {
             if (strcmp(table[j].name, pProperty->name) == 0) {
                 *(table[j].ptr) = pProperty->prop_id;

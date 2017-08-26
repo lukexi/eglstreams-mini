@@ -2,7 +2,6 @@ INCLUDE_DIRS = -I/usr/include/libdrm -Isrc
 LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm -lturbojpeg -lpthread
 
 SHADERS += $(wildcard shaders/*)
-HEADERS += $(wildcard src/*.h)
 SOURCES += $(wildcard src/*.c)
 OBJECTS += $(SOURCES:src/%.c=build/%.o)
 DEPENDS := $(SOURCES:src/%.c=build/%.d)
@@ -26,7 +25,7 @@ build/:
 
 # Build each c file into a .o in the build dir
 # (this caches them for faster rebuilds)
-build/%.o: src/%.c $(HEADERS)
+build/%.o: src/%.c
 	clang -MMD -c -o $@ $< $(CFLAGS) $(INCLUDE_DIRS)
 
 %.app: ./%.c $(OBJECTS)
