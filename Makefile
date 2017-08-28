@@ -7,7 +7,8 @@ OBJECTS += $(SOURCES:src/%.c=build/%.o)
 DEPENDS := $(SOURCES:src/%.c=build/%.d)
 
 CFLAGS += -Wall
-# CFLAGS += -O3
+CFLAGS += -Wno-unused-function
+CFLAGS += -O3
 # Debugging support
 CFLAGS += -g
 # Needed for creating .so files
