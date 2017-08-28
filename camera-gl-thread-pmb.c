@@ -21,16 +21,10 @@ This also runs pretty terribly, if I remember right.
 #include "quad.h"
 #include "texture.h"
 #include "mvar.h"
+#include "global-state.h"
 
 GLuint FullscreenQuadProgram;
-
-
-static const int CameraChannels = 3;
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-static const int CameraFPS = 30;
-
-#define NUM_TEXTURES 4
+#define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];
 
 typedef struct {

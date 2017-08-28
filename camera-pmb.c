@@ -20,13 +20,7 @@ This is very low latency and lovely, and serves as our target experience.
 #include "quad.h"
 #include "texture.h"
 #include "mvar.h"
-
-
-
-static const int CameraChannels = 3;
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-static const int CameraFPS = 30;
+#include "global-state.h"
 
 #define NUM_TEXTURES 3
 GLuint CameraTexIDs[NUM_TEXTURES];

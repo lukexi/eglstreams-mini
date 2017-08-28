@@ -35,7 +35,7 @@ buffered_texture* CreateBufferedTexture(int Width, int Height, int Channels) {
     buffered_texture* BufTex = malloc(sizeof(buffered_texture));
 
     GLuint PBO; // Pixel Buffer Object
-    glGenBuffers(1, &PBO);
+    glCreateBuffers(1, &PBO);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, MemorySize, NULL, Flags);
@@ -65,9 +65,9 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
     // Wait for the sync associated with this buffer
     WaitSync(BufTex->Syncs[BufTex->WriteIndex]);
 
-    const size_t   BufferOffset   = BufTex->ElementSize * BufTex->WriteIndex;
+    const size_t   MemoryOffset   = BufTex->ElementSize * BufTex->WriteIndex;
 
-    const uint8_t* WritableMemory = BufTex->BufferMemory + BufferOffset;
+    const uint8_t* WritableMemory = BufTex->BufferMemory + MemoryOffset;
 
     // If we want to avoid this memcpy, we can split this function
     // here and give back a pointer to WriteableMemory to write into directly.
@@ -87,7 +87,7 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
         BufTex->TexWidth, BufTex->TexHeight,
         GL_RGB,
         GL_UNSIGNED_BYTE,
-        (void*)BufferOffset);
+        (void*)MemoryOffset);
 
     // Lock the sync associated with this buffer
     // We'll wait on it next time it rolls around to

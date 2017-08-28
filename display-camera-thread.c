@@ -22,11 +22,7 @@ Cameras write using synchronous uploads to a single texture.
 #include "quad.h"
 #include "texture.h"
 #include "mvar.h"
-
-static const int CameraChannels = 3;
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-static const int CameraFPS = 30;
+#include "global-state.h"
 
 GLuint FullscreenQuadProgram;
 GLuint CameraTexID;

@@ -21,11 +21,7 @@ to the lowest sync interval
 #include "quad.h"
 #include "texture.h"
 #include "mvar.h"
-
-static const int CameraChannels = 3;
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-static const int CameraFPS = 30;
+#include "global-state.h"
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;

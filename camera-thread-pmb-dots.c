@@ -22,17 +22,11 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "dotdetector.h"
 #include "dotframe.h"
 #include "texture.h"
+#include "buffered-texture.h"
 #include "mvar.h"
+#include "global-state.h"
 
-static const int CameraChannels = 3;
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-static const int CameraFPS = 30;
-
-#define NUM_TEXTURES 3
-GLuint CameraTexIDs[NUM_TEXTURES];
-
-int DrawIndex = 0;
+#define MAX_FRAMES 600
 
 void* CameraThreadMain(void* Args) {
     mvar* CameraMVar = (mvar*)Args;
@@ -57,13 +51,13 @@ void* CameraThreadMain(void* Args) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
         Display->Context);
-    eglSwapInterval(Display->DisplayDevice, 0);
+    eglSwapInterval(Display->DisplayDevice, 1);
     glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
@@ -73,19 +67,7 @@ int main() {
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
 
-    for (int i = 0; i < NUM_TEXTURES; i++) {
-        CameraTexIDs[i] = CreateTexture(CameraWidth, CameraHeight, CameraChannels);
-    }
-
-    const int CameraBufferSize = CameraWidth * CameraHeight * CameraChannels;
-    const int TripleBufferSize = CameraBufferSize * NUM_TEXTURES; // Triple buffering
-
-    GLuint PBO;
-    glGenBuffers(1, &PBO);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
-    int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
-    uint8_t* CameraPBOBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
+    buffered_texture* CameraBufTex = CreateBufferedTexture(CameraWidth, CameraHeight, CameraChannels);
 
     // Camera setup
     mvar* CameraMVar = CreateMVar(free);
@@ -96,40 +78,42 @@ int main() {
     dotdetector_state* DotDetector = InitializeDotDetector();
     dot_t* Dots = malloc(MAX_DOTS * sizeof(dot_t));
 
-    int BufferIndex = 0;
+    frame_t* Frames = NULL;
+    int FramesCount = 0;
+
     fps FPS = MakeFPS("Display Thread");
     while (1) {
 
         // Update camera
-        uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
-        if (CameraBuffer) {
+        uint8_t* NewCameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
+        if (NewCameraBuffer) {
             NEWTIME(UpdateTexture);
-            const size_t BufferOffset = CameraBufferSize * BufferIndex;
-            const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
-            memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
-            free(CameraBuffer);
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
-            glTextureSubImage2D(
-                CameraTexIDs[BufferIndex],
-                0,
-                0, 0,
-                CameraWidth, CameraHeight,
-                GL_RGB,
-                GL_UNSIGNED_BYTE,
-                (void*)BufferOffset);
+
+            UploadToBufferedTexture(CameraBufTex, NewCameraBuffer);
+            free(NewCameraBuffer);
+
             GRAPHTIME(UpdateTexture, "*");
 
-            BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
-            DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
+            NEWTIME(DetectDots);
+            int DotsCount = DetectDots(DotDetector,
+                    4, 12,
+                    GetReadableTexture(CameraBufTex), GL_RGBA8,
+                    Dots);
+            GRAPHTIME(DetectDots, ".");
+            printf("Got dots: %i\n", DotsCount);
+
+            NEWTIME(Frames);
+            frame_t* NewCameraFrames = malloc(MAX_FRAMES * sizeof(frame_t));
+            int NewCameraFramesCount = dotframe_update_frames(
+                Dots, DotsCount,
+                Frames, FramesCount,
+                NewCameraFrames, MAX_FRAMES - FramesCount);
+            if (Frames) free(Frames);
+            Frames      = NewCameraFrames;
+            FramesCount = NewCameraFramesCount;
+            GRAPHTIME(Frames, "]");
         }
 
-        NEWTIME(Detect);
-        int NumDots = DetectDots(DotDetector,
-                4, 12,
-                CameraTexIDs[DrawIndex], GL_RGBA8,
-                Dots);
-        GRAPHTIME(Detect, ".");
-        // printf("Got dots: %i\n", NumDots);
         // printf(">%i %i>\n", BufferIndex, DrawIndex);
 
         // Draw
@@ -139,7 +123,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(FullscreenQuadProgram);
         glBindVertexArray(FullscreenQuadVAO);
-        glBindTexture(GL_TEXTURE_2D, CameraTexIDs[DrawIndex]);
+        glBindTexture(GL_TEXTURE_2D, GetReadableTexture(CameraBufTex));
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glBindTexture(GL_TEXTURE_2D, 0);
         GRAPHTIME(Draw, "/");
@@ -151,7 +135,9 @@ int main() {
         // GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
 
-        // TickFPS(&FPS);
+        QueryDotDetectorComputeTime(DotDetector);
+
+        TickFPS(&FPS);
     }
 
     return 0;

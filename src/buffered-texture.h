@@ -7,7 +7,7 @@
 typedef struct {
     int WriteIndex;
     int ReadIndex;
-    int ElementSize;
+    size_t ElementSize;
     uint8_t* BufferMemory;
     GLuint PBO;
     GLsync Syncs[PMB_SIZE];
