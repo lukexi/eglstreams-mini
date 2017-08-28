@@ -20,8 +20,8 @@ Each display uses its own OpenGL context
 
 
 int main() {
-
-    egl_state* EGL = SetupEGL();
+    bool UseContextPerDisplay = false;
+    egl_state* EGL = SetupEGL(UseContextPerDisplay);
 
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(

@@ -1,3 +1,9 @@
+/*
+This runs the camera on a thread with its own GL context
+and does the copy into the texture from there.
+This runs pretty terribly, if I remember right.
+(similar to camera-thread-gl-pmb)
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>

@@ -106,7 +106,7 @@ int main() {
         if (CameraBuffer) {
 
             NEWTIME(UpdateTexture);
-            WaitBuffer(CameraSyncs[BufferIndex]);
+            WaitSync(CameraSyncs[BufferIndex]);
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
@@ -120,7 +120,7 @@ int main() {
                 GL_RGB,
                 GL_UNSIGNED_BYTE,
                 (void*)BufferOffset);
-            LockBuffer(&CameraSyncs[BufferIndex]);
+            LockSync(&CameraSyncs[BufferIndex]);
             GRAPHTIME(UpdateTexture, "*");
 
             BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;

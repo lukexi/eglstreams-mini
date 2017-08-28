@@ -1,3 +1,9 @@
+/*
+This runs the camera on a thread with its own GL context
+and does the copy into the PMB from there.
+This also runs pretty terribly, if I remember right.
+(similar to camera-thread-gl)
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -130,7 +136,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",

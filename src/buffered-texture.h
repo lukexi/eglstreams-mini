@@ -22,4 +22,8 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data);
 
 GLuint GetReadableTexture(buffered_texture* BufTex);
 
+
+void WaitSync(GLsync Sync);
+void LockSync(GLsync* Sync);
+
 #endif // BUFFERED_TEXTURE_H

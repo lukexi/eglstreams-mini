@@ -1,7 +1,10 @@
 #include <GL/glew.h>
+#include <stdio.h>
+#include <memory.h>
 #include "buffered-texture.h"
+#include "texture.h"
 
-void WaitBuffer(GLsync Sync) {
+void WaitSync(GLsync Sync) {
     if (!Sync) {
         return;
     }
@@ -15,11 +18,10 @@ void WaitBuffer(GLsync Sync) {
     }
 }
 
-void LockBuffer(GLsync* Sync) {
+void LockSync(GLsync* Sync) {
     glDeleteSync(*Sync);
     *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }
-
 
 
 // e.g.
@@ -60,7 +62,8 @@ buffered_texture* CreateBufferedTexture(int Width, int Height, int Channels) {
 
 void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
 
-    WaitBuffer(BufTex->Syncs[BufTex->WriteIndex]);
+    // Wait for the sync associated with this buffer
+    WaitSync(BufTex->Syncs[BufTex->WriteIndex]);
 
     const size_t   BufferOffset   = BufTex->ElementSize * BufTex->WriteIndex;
 
@@ -70,7 +73,7 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
     // here and give back a pointer to WriteableMemory to write into directly.
 
     // NOTE(lxi): this may in fact be worth a try; the only GL communication
-    // needed from the camera thread is the WaitBuffer call.
+    // needed from the camera thread is the WaitSync call.
 
     memcpy((void*)WritableMemory,
         Data,
@@ -86,7 +89,10 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
         GL_UNSIGNED_BYTE,
         (void*)BufferOffset);
 
-    LockBuffer(&BufTex->Syncs[BufTex->WriteIndex]);
+    // Lock the sync associated with this buffer
+    // We'll wait on it next time it rolls around to
+    // make sure we're not stomping on in-flight data.
+    LockSync(&BufTex->Syncs[BufTex->WriteIndex]);
 
     // Advance the ring buffer indicies.
     // We want the draw-call (read) index to

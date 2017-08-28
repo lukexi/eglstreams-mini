@@ -50,23 +50,39 @@ typedef struct {
 
 // One call to do all of the below
 egl_state* SetupEGL();
+egl_state* SetupEGLThreaded();
 
 // Components of SetupEGL
-EGLDeviceEXT GetEglDevice(void);
 
+// Gets a single graphics card.
+// TODO: We'll want this to return all graphics cards.
+EGLDeviceEXT GetEglDevice();
+
+// Gets the DRM file descriptor needed to connect EGL to DRM/KMS
 int GetDrmFd(EGLDeviceEXT device);
 
+// Gets the "EGLDisplay" object,
+// for which there is only one per graphics card.
+// Not to be confused with a reference to an actual display, which I
+// call an egl_display (which is pretty confusing; FIXME)
 EGLDisplay GetEglDisplay(EGLDeviceEXT device, int drmFd);
 
+// Gets an EGLConfig configured for rendering via EGLStreams.
 EGLConfig GetEglConfig(EGLDisplay eglDpy);
+
+// Creates a root OpenGL context.
 EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig);
 
+// Creates a display for each kms_plane passed in.
 egl_display* SetupEGLDisplays(
     EGLDisplay eglDpy,
     EGLConfig eglConfig,
     EGLContext eglContext,
     kms_plane* Planes,
-    int NumPlanes);
+    int NumPlanes,
+    // If interacting with the displays from a thread,
+    // they must have their own context
+    bool UseContextPerDisplay);
 
 void InitGLEW();
 

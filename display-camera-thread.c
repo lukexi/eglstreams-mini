@@ -1,7 +1,7 @@
 /*
 Each display runs on its own thread
 Each camera  runs on its own thread
-Cameras write using synchronous uploads to a single texture
+Cameras write using synchronous uploads to a single texture.
 */
 
 
@@ -104,7 +104,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 }
 
 int main() {
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(

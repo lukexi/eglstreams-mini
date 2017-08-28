@@ -93,7 +93,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     // egl_display* Display = &EGL->Displays[1];
     // eglMakeCurrent(Display->DisplayDevice,

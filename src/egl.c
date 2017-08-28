@@ -392,7 +392,8 @@ egl_display* SetupEGLDisplays(
     EGLDisplay eglDpy,
     EGLConfig eglConfig,
     EGLContext eglContext,
-    kms_plane* Planes, int NumPlanes)
+    kms_plane* Planes, int NumPlanes,
+    bool UseContextPerDisplay)
 {
 
     EGLBoolean ret;
@@ -480,20 +481,18 @@ egl_display* SetupEGLDisplays(
          * Make current to the EGLSurface, so that OpenGL rendering is
          * directed to it.
          */
-        // EGLContext DisplayContext = eglContext;
+        EGLContext DisplayContext = eglContext;
 
-        EGLint contextAttribs[] = { EGL_NONE };
-        EGLContext DisplayContext =
-            eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
-        if (DisplayContext == NULL) {
-            Fatal("eglCreateContext() failed.\n");
+        // If interacting with the displays from a thread,
+        // they must have their own context.
+        if (UseContextPerDisplay) {
+            EGLint contextAttribs[] = { EGL_NONE };
+            DisplayContext =
+                eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
+            if (DisplayContext == NULL) {
+                Fatal("eglCreateContext() failed.\n");
+            }
         }
-
-        // ret = eglMakeCurrent(eglDpy, eglSurface, eglSurface, DisplayContext);
-
-        // if (!ret) {
-        //     Fatal("Unable to make context and surface current.\n");
-        // }
 
         Displays[PlaneIndex].EDID          = Plane->EDID;
         Displays[PlaneIndex].Width         = Plane->Width;
@@ -520,7 +519,7 @@ void InitGLEW() {
     }
 }
 
-egl_state* SetupEGL() {
+egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
     egl_state* EGL = malloc(sizeof(egl_state));
 
     // Setup global EGL state
@@ -534,16 +533,29 @@ egl_state* SetupEGL() {
     EGL->Config        = GetEglConfig(EGL->DisplayDevice);
     EGL->RootContext   = GetEglContext(EGL->DisplayDevice, EGL->Config);
 
-    EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
+    EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice,
+        EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
     if (!ret) Fatal("Couldn't make main context current\n");
 
     InitGLEW();
 
     // Set up EGL state for each connected display
     kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
-    EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice, EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount);
+    EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice,
+        EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount,
+        UseContextPerDisplay);
 
     return EGL;
+}
+
+egl_state* SetupEGL() {
+    bool UseContextPerDisplay = false;
+    return SetupEGLInternal(UseContextPerDisplay);
+}
+
+egl_state* SetupEGLThreaded() {
+    bool UseContextPerDisplay = true;
+    return SetupEGLInternal(UseContextPerDisplay);
 }
 
 

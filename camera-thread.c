@@ -1,7 +1,8 @@
 /*
-Runs the camera on its own thread, and displays on the main thread,
-with potential vsync blocking.
-(with 2 30hz monitors, it seems to run fine at locked 30fps)
+Runs the camera on its own thread, and displays on the main thread.
+I expected VSync interference, but instead it seems to lock
+to the lowest sync interval
+(e.g. with a 30hz and a 60hz monitor, it runs at a smooth locked 30FPS.)
 */
 #include <stdlib.h>
 #include <stdio.h>

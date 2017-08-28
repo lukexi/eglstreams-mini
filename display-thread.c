@@ -50,7 +50,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 }
 
 int main() {
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
