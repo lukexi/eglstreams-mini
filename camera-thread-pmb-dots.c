@@ -38,10 +38,12 @@ void* CameraThreadMain(void* Args) {
         Fatal("Couldn't find a camera : (\n");
     }
 
+    fps FPS = MakeFPS("Capture Rate");
     while (1) {
         uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
         camera_capture(CameraState, CameraBuffer);
         TryWriteMVar(CameraMVar, CameraBuffer);
+        TickFPS(&FPS);
     }
 
     return NULL;
@@ -81,7 +83,8 @@ int main() {
     frame_t* Frames = NULL;
     int FramesCount = 0;
 
-    fps FPS = MakeFPS("Display Thread");
+    fps FPS = MakeFPS("Display Rate");
+    fps CamFPS = MakeFPS("Camera Rate");
     while (1) {
 
         // Update camera
@@ -94,6 +97,7 @@ int main() {
 
             GRAPHTIME(UpdateTexture, "*");
 
+#if 1
             NEWTIME(DetectDots);
             int DotsCount = DetectDots(DotDetector,
                     4, 12,
@@ -112,6 +116,8 @@ int main() {
             Frames      = NewCameraFrames;
             FramesCount = NewCameraFramesCount;
             GRAPHTIME(Frames, "]");
+#endif
+            TickFPS(&CamFPS);
         }
 
         // printf(">%i %i>\n", BufferIndex, DrawIndex);

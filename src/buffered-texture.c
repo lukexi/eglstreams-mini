@@ -100,7 +100,7 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
     // with the one in the middle reserved for the GPU's current rendering.
     const int WrittenIndex = BufTex->WriteIndex;
     BufTex->WriteIndex = (WrittenIndex + 1) % PMB_SIZE;
-    BufTex->ReadIndex  = (WrittenIndex + 3) % PMB_SIZE;
+    BufTex->ReadIndex  = (WrittenIndex + 2) % PMB_SIZE;
 }
 
 GLuint GetReadableTexture(buffered_texture* BufTex) {
