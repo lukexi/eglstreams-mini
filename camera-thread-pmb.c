@@ -57,8 +57,9 @@ void WaitBuffer(GLsync Sync) {
     while (1) {
         GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
         if (WaitResult == GL_ALREADY_SIGNALED ||
-            WaitResult == GL_CONDITION_SATISFIED)
-              return;
+            WaitResult == GL_CONDITION_SATISFIED) {
+            return;
+        }
         WaitCount++;
     }
 }
@@ -75,7 +76,7 @@ int main() {
 
     egl_state* EGL = SetupEGL();
 
-    egl_display* Display = &EGL->Displays[1];
+    egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
         Display->Context);
@@ -112,9 +113,10 @@ int main() {
 
 
     int BufferIndex = 0;
+    int FrameCount = 0;
     while (1) {
-        // Update camera
 
+        // Update camera
         uint8_t* CameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
         if (CameraBuffer) {
 
@@ -123,6 +125,7 @@ int main() {
             const size_t BufferOffset = CameraBufferSize * BufferIndex;
             const uint8_t* CurrentPBOBuffer = CameraPBOBuffer + BufferOffset;
             memcpy((void*)CurrentPBOBuffer, CameraBuffer, CameraBufferSize);
+            free(CameraBuffer);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
             glTextureSubImage2D(
                 CameraTexIDs[BufferIndex],
@@ -136,16 +139,11 @@ int main() {
             GRAPHTIME(UpdateTexture, "*");
 
             BufferIndex = (BufferIndex + 1) % NUM_TEXTURES;
-            DrawIndex = (BufferIndex + 1) % NUM_TEXTURES;
+            DrawIndex   = (BufferIndex + 1) % NUM_TEXTURES;
+            // printf(">%i %i>\n", BufferIndex, DrawIndex);
         }
 
-        // printf(">%i %i>\n", BufferIndex, DrawIndex);
-
         // Draw
-
-        // printf("Drawing %s\n", DisplayName);
-        // Draw a texture to the display framebuffer
-
         NEWTIME(Draw);
         glClearColor(
             1,
@@ -167,6 +165,7 @@ int main() {
         GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
         if (WaitCount) printf("Have waited %i times\n", WaitCount);
+        printf("Frame: %i\n", FrameCount++);
     }
 
     return 0;
