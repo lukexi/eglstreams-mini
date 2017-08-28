@@ -24,7 +24,6 @@ vec2 vec2_lerp(vec2 v1, vec2 v2, float a);
 // The matrix representing "do m1, then m2". (Opposite of mathematical notation.)
 mat3 mat3_sequence(mat3 m1, mat3 m2);
 mat3 mat3_sequence3(mat3 m1, mat3 m2, mat3 m3);
-mat3 mat3_inv(mat3 m);
 mat3 mat3_translation(vec2 v);
 mat3 mat3_rotation(float angle);
 vec2 apply_homography(mat3 m, vec2 v);

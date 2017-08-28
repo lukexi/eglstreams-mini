@@ -1,7 +1,7 @@
 #include <GL/glew.h>
 #include "utils.h"
 #include "dotframe.h"
-// #include "global-state.h"
+#include "global-state.h"
 #include "shader.h"
 #include <math.h>
 
@@ -102,14 +102,11 @@ dotdetector_state* InitializeDotDetector () {
     return Detector;
 }
 
-static const int CameraWidth = 1920;
-static const int CameraHeight = 1080;
-
 int DetectDots (dotdetector_state* Detector,
                 int MinRadius, int MaxRadius,
                 GLuint CameraTexID, GLenum CameraTexFormat,
                 dot_t* OutDots) {
-    // glBeginQuery(GL_TIME_ELAPSED, Detector->Query);
+    glBeginQuery(GL_TIME_ELAPSED, Detector->Query);
 
     glUseProgram(Detector->Program);
     // glUniform1f(glGetUniformLocation(Program, "uTime"), time);
@@ -140,22 +137,22 @@ int DetectDots (dotdetector_state* Detector,
     // Make sure writing to image has finished before read
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
-    // glEndQuery(GL_TIME_ELAPSED);
+    glEndQuery(GL_TIME_ELAPSED);
 
     // Extract the results of the dot detector compute shader
     found_dots ReturnedSSBOData;
     glGetNamedBufferSubData(Detector->SSBO, 0, sizeof(found_dots), &ReturnedSSBOData);
 
     // If you like, print out the timing info
-    // int QueryDone;
-    // glGetQueryObjectiv(Detector->Query,
-    //     GL_QUERY_RESULT_AVAILABLE,
-    //     &QueryDone);
-    // if (QueryDone) {
-    //     GLuint64 elapsed_time;
-    //     glGetQueryObjectui64v(Detector->Query, GL_QUERY_RESULT, &elapsed_time);
-    //     printf("Dot detection took %.2f ms\n", elapsed_time / 1000000.0);
-    // }
+    int QueryDone;
+    glGetQueryObjectiv(Detector->Query,
+        GL_QUERY_RESULT_AVAILABLE,
+        &QueryDone);
+    if (QueryDone) {
+        GLuint64 elapsed_time;
+        glGetQueryObjectui64v(Detector->Query, GL_QUERY_RESULT, &elapsed_time);
+        // printf("Dot detection took %.2f ms\n", elapsed_time / 1000000.0);
+    }
 
     // Assemble dots for sorting
     dot_t Dots[MAX_DOTS];
@@ -220,6 +217,8 @@ int DetectDots (dotdetector_state* Detector,
             }
         }
     }
+    free(DotsInBinCountArr);
+    free(DotsInBinArr);
 
     int OutDotsCount = 0;
     for (int i = 0; i < ConsolidatedDotsCount; i++) {

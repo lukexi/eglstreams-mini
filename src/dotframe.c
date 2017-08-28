@@ -152,7 +152,7 @@ static df_frame_t rotate_frame(df_frame_t frame) {
 int code240_initialized = 0;
 uint8_t code240_pattern_to_index[997];
 
-int code240_pattern_as_int(int a, int b, int c, int d, int e) {
+inline int code240_pattern_as_int(int a, int b, int c, int d, int e) {
     return 256 * a + 64 * b + 16 * c + 4 * d + e;
 }
 

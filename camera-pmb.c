@@ -37,13 +37,13 @@ int DrawIndex = 0;
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
-    egl_display* Display = &EGL->Displays[1];
+    egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
         Display->Context);
-    eglSwapInterval(Display->DisplayDevice, 0);
+    // eglSwapInterval(Display->DisplayDevice, 0);
     glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
@@ -65,7 +65,6 @@ int main() {
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PBO);
     int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glNamedBufferStorage(PBO, TripleBufferSize, NULL, Flags);
-    // uint8_t* CameraBuffer = (uint8_t*)glMapNamedBuffer(PBO, Flags);
     uint8_t* CameraBuffer = (uint8_t*)glMapNamedBufferRange(PBO, 0, TripleBufferSize, Flags);
 
     // Camera setup
@@ -75,7 +74,7 @@ int main() {
         Fatal("Couldn't find a camera : (\n");
     }
 
-
+    GLCheck("Display ThreadX");
 
 
     int BufferIndex = 0;

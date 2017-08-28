@@ -1,7 +1,10 @@
 #ifndef DOTDETECTOR_H
 #define DOTDETECTOR_H
-#define MAX_DOTS 16384
+
 #include "dotframe.h"
+
+#define MAX_DOTS 16384
+
 typedef struct {
     GLuint Program;
     GLuint SSBO;
@@ -16,4 +19,5 @@ int DetectDots (dotdetector_state* Detector,
                 dot_t* OutDots);
 
 void CleanupDotDetector (dotdetector_state* Detector);
+
 #endif // DOTDETECTOR_H

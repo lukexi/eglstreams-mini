@@ -53,7 +53,7 @@ void* CameraThreadMain(void* Args) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGL();
+    egl_state* EGL = SetupEGLThreaded();
 
     egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,
