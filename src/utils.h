@@ -17,6 +17,11 @@ float GetTime(void);
 
 void GLCheck(const char* name);
 
+// Turns on basic OpenGL 4.3 Debugging output.
+// Lots more fancy options available,
+// like synchronous output, debug groups,
+// object naming, see here page 65:
+// https://www.slideshare.net/Mark_Kilgard/opengl-45-update-for-nvidia-gpus
 void EnableGLDebug();
 
 int NextPowerOfTwo(int x);
