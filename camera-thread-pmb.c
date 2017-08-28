@@ -20,6 +20,7 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "shader.h"
 #include "quad.h"
 #include "texture.h"
+#include "buffered-texture.h"
 #include "mvar.h"
 
 static const int CameraChannels = 3;
@@ -52,25 +53,6 @@ void* CameraThreadMain(void* Args) {
     }
 
     return NULL;
-}
-
-void WaitBuffer(GLsync Sync) {
-    if (!Sync) {
-        return;
-    }
-    while (1) {
-        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
-        if (WaitResult == GL_ALREADY_SIGNALED ||
-            WaitResult == GL_CONDITION_SATISFIED) {
-            return;
-        }
-        WaitCount++;
-    }
-}
-
-void LockBuffer(GLsync* Sync) {
-    glDeleteSync(*Sync);
-    *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }
 
 
