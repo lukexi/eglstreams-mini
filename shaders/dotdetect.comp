@@ -15,7 +15,6 @@ struct shader_dot {
     float L;
     float a;
     float b;
-    float Padding;
 };
 
 layout(std430, binding = 1) buffer ssbo_data {
@@ -158,7 +157,7 @@ void addDot(ivec2 position, vec2 radius) {
         // vec4 rgb = getColor(position);
         vec4 rgb = colorForDot(position, radius);
         vec3 lab = rgbToLab(rgb);
-        Dots[Index] = shader_dot(float(position.x), float(position.y), radius.x, radius.y, lab.x, lab.y, lab.z, 0);
+        Dots[Index] = shader_dot(float(position.x), float(position.y), radius.x, radius.y, lab.x, lab.y, lab.z);
     }
 }
 

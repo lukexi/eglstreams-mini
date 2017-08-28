@@ -14,13 +14,11 @@ typedef struct {
     float L;
     float a;
     float b;
-    float Padding;
 } shader_dot;
 
 typedef struct {
     shader_dot Dots[MAX_DOTS];
     int NumDots;
-    int __Padding[3];
 } found_dots;
 
 typedef struct {

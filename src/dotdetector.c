@@ -162,7 +162,7 @@ int DetectDots (dotdetector_state* Detector,
 
     const int WrittenIndex = Detector->WriteIndex;
     Detector->WriteIndex = (WrittenIndex + 1) % PMB_SIZE;
-    Detector->ReadIndex  = (WrittenIndex + 3) % PMB_SIZE;
+    Detector->ReadIndex  = (WrittenIndex + 2) % PMB_SIZE;
 
     glEndQuery(GL_TIME_ELAPSED);
 
