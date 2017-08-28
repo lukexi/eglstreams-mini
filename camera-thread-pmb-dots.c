@@ -26,6 +26,8 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "mvar.h"
 #include "global-state.h"
 
+
+
 #define MAX_FRAMES 600
 
 void* CameraThreadMain(void* Args) {
@@ -54,6 +56,8 @@ int main() {
     GetTime();
 
     egl_state* EGL = SetupEGLThreaded();
+
+    EnableGLDebug();
 
     egl_display* Display = &EGL->Displays[0];
     eglMakeCurrent(Display->DisplayDevice,

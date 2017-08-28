@@ -17,6 +17,8 @@ float GetTime(void);
 
 void GLCheck(const char* name);
 
+void EnableGLDebug();
+
 int NextPowerOfTwo(int x);
 
 #define NEWTIME(name) float __##name##Before = GetTime();

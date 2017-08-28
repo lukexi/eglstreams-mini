@@ -89,7 +89,18 @@ void GLCheck(const char* name) {
     }
 }
 
+void GLAPIENTRY DebugCallback(GLenum Source, GLenum Type,
+    GLuint ID, GLenum Severity, GLsizei Length,
+    const GLchar* Message, const void* UserParam) {
+    printf("===OPENGL DEBUG 0x%X: %s\n", ID, Message);
+}
 
+void EnableGLDebug() {
+    glDebugMessageCallback(DebugCallback, NULL);
+    glDebugMessageControl(GL_DONT_CARE,
+        GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE);
+    glEnable(GL_DEBUG_OUTPUT);
+}
 
 int NextPowerOfTwo(int x) {
     x--;
