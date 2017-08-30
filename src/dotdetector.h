@@ -4,10 +4,6 @@
 #include "dotframe.h"
 #include "shader-buffer.h"
 
-#ifndef PMB_SIZE
-#define PMB_SIZE 3
-#endif
-
 #define MAX_DOTS 16384
 
 typedef struct {

@@ -3,7 +3,7 @@
 #include "shader-buffer.h"
 #include "utils.h"
 
-shader_buffer* CreateShaderBuffer(size_t ElementSize) {
+shader_buffer* CreateShaderBuffer(size_t ElementSize, GLuint ShaderBindingPoint) {
 
     shader_buffer* SSB = calloc(1, sizeof(shader_buffer));
 
@@ -28,6 +28,7 @@ shader_buffer* CreateShaderBuffer(size_t ElementSize) {
     SSB->SSBOMemory         = BufferMemory;
     SSB->ElementSize        = ElementSize;
     SSB->AlignedElementSize = AlignedElementSize;
+    SSB->ShaderBindingPoint = ShaderBindingPoint;
 
     GLCheck("CreateShaderBufferSSB");
 
@@ -45,10 +46,15 @@ void ShaderBufferBeginWrite(shader_buffer* SSB) {
     const void*  WritableMemory       = SSB->SSBOMemory         + WritableMemoryOffset;
 
     WaitSync(SSB->Syncs[SSB->WriteIndex]);
+
     memset((void*)WritableMemory, 0, SSB->ElementSize);
+
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSB->SSBO);
-    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, SSB->SSBO,
-        WritableMemoryOffset, SSB->ElementSize);
+    glBindBufferRange(GL_SHADER_STORAGE_BUFFER,
+        SSB->ShaderBindingPoint,
+        SSB->SSBO,
+        WritableMemoryOffset,
+        SSB->ElementSize);
 }
 
 void ShaderBufferEndWrite(shader_buffer* SSB) {

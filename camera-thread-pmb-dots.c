@@ -55,7 +55,7 @@ void* CameraThreadMain(void* Args) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGLThreaded();
+    egl_state* EGL = SetupEGL();
 
     EnableGLDebug();
 
@@ -65,12 +65,14 @@ int main() {
         Display->Context);
     eglSwapInterval(Display->DisplayDevice, 1);
     glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
         "shaders/textured.frag"
         );
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+    GLCheck("CreateFullscreenQuad");
 
 
     texture_buffer* CameraBufTex = CreateBufferedTexture(CameraWidth, CameraHeight, CameraChannels);
@@ -90,6 +92,10 @@ int main() {
     fps FPS = MakeFPS("Display Rate");
     fps CamFPS = MakeFPS("Camera Rate");
     while (1) {
+        eglMakeCurrent(Display->DisplayDevice,
+            Display->Surface, Display->Surface,
+            Display->Context);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Update camera
         uint8_t* NewCameraBuffer = (uint8_t*)TryReadMVar(CameraMVar);
@@ -124,7 +130,7 @@ int main() {
             TickFPS(&CamFPS);
         }
 
-        // printf(">%i %i>\n", BufferIndex, DrawIndex);
+        // printf("%i>\n", GetReadableTexture(CameraBufTex));
 
         // Draw
 

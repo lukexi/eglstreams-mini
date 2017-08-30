@@ -381,7 +381,6 @@ EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig) {
     if (eglContext == NULL) {
         Fatal("eglCreateContext() failed.\n");
     }
-
     return eglContext;
 }
 
@@ -520,7 +519,7 @@ void InitGLEW() {
 }
 
 egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
-    egl_state* EGL = malloc(sizeof(egl_state));
+    egl_state* EGL = calloc(1, sizeof(egl_state));
 
     // Setup global EGL state
     GetEglExtensionFunctionPointers();
@@ -533,17 +532,17 @@ egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
     EGL->Config        = GetEglConfig(EGL->DisplayDevice);
     EGL->RootContext   = GetEglContext(EGL->DisplayDevice, EGL->Config);
 
-    EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice,
-        EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
-    if (!ret) Fatal("Couldn't make main context current\n");
-
-    InitGLEW();
-
     // Set up EGL state for each connected display
     kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
     EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice,
         EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount,
         UseContextPerDisplay);
+
+    EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice,
+        EGL->Displays->Surface, EGL->Displays->Surface, EGL->RootContext);
+    if (!ret) Fatal("Couldn't make main context current\n");
+
+    InitGLEW();
 
     return EGL;
 }

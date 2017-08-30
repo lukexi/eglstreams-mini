@@ -28,6 +28,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
     eglMakeCurrent(Display->DisplayDevice,
         Display->Surface, Display->Surface,
         Display->Context);
+    eglSwapInterval(Display->DisplayDevice, 1);
     glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
 
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
@@ -51,6 +52,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
 int main() {
     egl_state* EGL = SetupEGLThreaded();
+    eglSwapInterval(EGL->DisplayDevice, 1);
 
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(

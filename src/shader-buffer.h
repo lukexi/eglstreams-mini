@@ -2,19 +2,23 @@
 #define SHADER_BUFFER_H
 
 #include <GL/glew.h>
-#include <texture-buffer.h>
+
+#ifndef PMB_SIZE
+#define PMB_SIZE 3
+#endif
 
 typedef struct {
     GLuint SSBO;
+    GLuint ShaderBindingPoint;
+    size_t ElementSize;
+    size_t AlignedElementSize;
     void* SSBOMemory;
     GLsync Syncs[PMB_SIZE];
     int WriteIndex;
     int ReadIndex;
-    size_t ElementSize;
-    size_t AlignedElementSize;
 } shader_buffer;
 
-shader_buffer* CreateShaderBuffer(size_t ElementSize);
+shader_buffer* CreateShaderBuffer(size_t ElementSize, GLuint ShaderBindingPoint);
 
 // This memsets the SSBO's next writable storage to 0, but could easily take
 // an element to memcpy in.

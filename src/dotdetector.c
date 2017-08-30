@@ -74,7 +74,8 @@ dotdetector_state* InitializeDotDetector () {
 
     Detector->Program = CreateComputeProgramFromPath("shaders/dotdetect.comp");
 
-    Detector->ShaderBuffer = CreateShaderBuffer(sizeof(found_dots));
+    const int ShaderBindingPoint = 1;
+    Detector->ShaderBuffer = CreateShaderBuffer(sizeof(found_dots), ShaderBindingPoint);
 
     glGenQueries(1, &Detector->Query);
 
@@ -152,7 +153,7 @@ int DetectDots (dotdetector_state* Detector,
         ConsolidatedDotsCount++;
     }
 
-    float BinSize = 5 * 17;  // roughly 5in at 17dpi
+    float BinSize = 6 * 17;  // roughly 6in x 6in at 17dpi
     int MaxDotsInBin = 20;
     int BinsWidth = ceil((float)1920 / BinSize);
     int BinsHeight = ceil((float)1080 / BinSize);
