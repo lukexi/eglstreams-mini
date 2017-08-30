@@ -1,17 +1,20 @@
 #include <GL/glew.h>
 #include <stdio.h>
 #include <memory.h>
+#include "utils.h"
 #include "texture.h"
 #include "texture-buffer.h"
 
 void WaitSync(GLsync Sync) {
-    if (!Sync) {
+    if (!Sync || !glIsSync(Sync)) {
         return;
     }
     while (1) {
-        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
+        GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000);
+        printf("Is sync? %i\n", glIsSync(Sync));
         if (WaitResult == GL_ALREADY_SIGNALED ||
-            WaitResult == GL_CONDITION_SATISFIED) {
+            WaitResult == GL_CONDITION_SATISFIED ||
+            WaitResult == GL_WAIT_FAILED) {
             return;
         }
         printf("***WAITING ON A BUFFERED TEXTURE SYNC OBJECT (tell Luke if you see this)\n");
@@ -19,7 +22,9 @@ void WaitSync(GLsync Sync) {
 }
 
 void LockSync(GLsync* Sync) {
-    glDeleteSync(*Sync);
+    GLsync OldSync = *Sync;
+    *Sync = NULL;
+    glDeleteSync(OldSync);
     *Sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }
 

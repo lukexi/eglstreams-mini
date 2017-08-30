@@ -539,7 +539,7 @@ egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
         UseContextPerDisplay);
 
     EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice,
-        EGL->Displays->Surface, EGL->Displays->Surface, EGL->RootContext);
+        EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
     if (!ret) Fatal("Couldn't make main context current\n");
 
     InitGLEW();

@@ -52,7 +52,6 @@ void* DisplayThreadMain(void* ThreadArguments) {
 
 int main() {
     egl_state* EGL = SetupEGLThreaded();
-    eglSwapInterval(EGL->DisplayDevice, 1);
 
     // Set up global resources
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
