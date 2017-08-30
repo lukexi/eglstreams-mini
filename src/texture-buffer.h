@@ -2,7 +2,9 @@
 #define BUFFERED_TEXTURE_H
 
 // One for GPU (last frame), one for upload (current frame), one for CPU (next frame)
+#ifndef PMB_SIZE
 #define PMB_SIZE 3
+#endif
 
 typedef struct {
     int WriteIndex;
@@ -14,13 +16,13 @@ typedef struct {
     GLuint Textures[PMB_SIZE];
     int TexWidth;
     int TexHeight;
-} buffered_texture;
+} texture_buffer;
 
-buffered_texture* CreateBufferedTexture(int Width, int Height, int Channels);
+texture_buffer* CreateBufferedTexture(int Width, int Height, int Channels);
 
-void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data);
+void UploadToBufferedTexture(texture_buffer* BufTex, uint8_t* Data);
 
-GLuint GetReadableTexture(buffered_texture* BufTex);
+GLuint GetReadableTexture(texture_buffer* BufTex);
 
 
 void WaitSync(GLsync Sync);

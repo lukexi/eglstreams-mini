@@ -74,39 +74,7 @@ dotdetector_state* InitializeDotDetector () {
 
     Detector->Program = CreateComputeProgramFromPath("shaders/dotdetect.comp");
 
-    // SSBO
-    glCreateBuffers(1, &Detector->SSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Detector->SSBO);
-    glUseProgram(Detector->Program);
-
-
-    GLint SSBOAlignment;
-    glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &SSBOAlignment);
-
-    // Reserve and clear SSBO memory
-    size_t ElementSize = sizeof(found_dots);
-    size_t AlignedElementSize =
-        (ElementSize / SSBOAlignment) * SSBOAlignment + SSBOAlignment;
-
-
-    printf("ElementSize: %zu AlignedElementSize: %zu\n", ElementSize, AlignedElementSize);
-
-    size_t MemorySize = AlignedElementSize * PMB_SIZE;
-
-    int Flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    glNamedBufferStorage(Detector->SSBO, MemorySize, NULL, Flags);
-    void* BufferMemory = glMapNamedBufferRange(Detector->SSBO, 0, MemorySize, Flags);
-    memset(BufferMemory, 0, MemorySize);
-
-    Detector->SSBOMemory         = (found_dots*)BufferMemory;
-    Detector->ElementSize        = ElementSize;
-    Detector->AlignedElementSize = AlignedElementSize;
-
-    // Bind the SSBO to layout binding 1 (must match in shader)
-    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, Detector->SSBO,
-        AlignedElementSize,
-        ElementSize);
-    GLCheck("MakeDetector");
+    Detector->ShaderBuffer = CreateShaderBuffer(sizeof(found_dots));
 
     glGenQueries(1, &Detector->Query);
 
@@ -117,7 +85,6 @@ int DetectDots (dotdetector_state* Detector,
                 int MinRadius, int MaxRadius,
                 GLuint CameraTexID, GLenum CameraTexFormat,
                 dot_t* OutDots) {
-    glBeginQuery(GL_TIME_ELAPSED, Detector->Query);
 
     glUseProgram(Detector->Program);
     // glUniform1f(glGetUniformLocation(Program, "uTime"), time);
@@ -134,18 +101,10 @@ int DetectDots (dotdetector_state* Detector,
     // glUniform1i(glGetUniformLocation(Program, "uImageOutput"), OutTextureUnit);
     // glBindImageTexture(OutTextureUnit, ComputeOutTexID, 0, GL_FALSE, 0, GL_WRITE_ONLY, ComputeOutTexFormat);
 
+    glBeginQuery(GL_TIME_ELAPSED, Detector->Query);
+
     // reset the SSBO
-    WaitSync(Detector->Syncs[Detector->WriteIndex]);
-
-    const size_t WritableMemoryOffset = Detector->AlignedElementSize * Detector->WriteIndex;
-    const void*  WritableMemory       = Detector->SSBOMemory         + WritableMemoryOffset;
-
-    memset((void*)WritableMemory, 0, sizeof(found_dots));
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Detector->SSBO);
-    GLCheck("DispatchX");
-    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, Detector->SSBO,
-        WritableMemoryOffset, Detector->ElementSize);
-    GLCheck("Dispatch0");
+    ShaderBufferBeginWrite(Detector->ShaderBuffer);
     const int GroupSize = 16;
     glDispatchComputeGroupSizeARB(
         // Number of groups (x,y,z)
@@ -153,25 +112,13 @@ int DetectDots (dotdetector_state* Detector,
         // Group size (x,y,z)
         GroupSize,    GroupSize,    1
         );
-
-    GLCheck("Dispatch");
     // Make sure writing to image has finished before read
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
-    LockSync(&Detector->Syncs[Detector->WriteIndex]);
-    GLCheck("Dispatch2");
-
-    const int WrittenIndex = Detector->WriteIndex;
-    Detector->WriteIndex = (WrittenIndex + 1) % PMB_SIZE;
-    Detector->ReadIndex  = (WrittenIndex + 2) % PMB_SIZE;
+    ShaderBufferEndWrite(Detector->ShaderBuffer);
 
     glEndQuery(GL_TIME_ELAPSED);
 
-    // Extract the results of the dot detector compute shader
-
-    // WaitSync(Detector->Syncs[Detector->ReadIndex]);
-    const size_t ReadableMemoryOffset = Detector->AlignedElementSize * Detector->ReadIndex;
-    const void*  ReadableMemoryV      = Detector->SSBOMemory + ReadableMemoryOffset;
-    const found_dots* ReadableMemory  = (found_dots*)ReadableMemoryV;
+    // Extract the results of the last run of the dot detector compute shader
+    const found_dots* ReadableMemory  = (found_dots*)ShaderBufferGetReadableMemory(Detector->ShaderBuffer);
 
     // Assemble dots for sorting
     dot_t Dots[MAX_DOTS];
@@ -271,6 +218,6 @@ void QueryDotDetectorComputeTime(dotdetector_state* Detector) {
 void CleanupDotDetector (dotdetector_state* Detector) {
     glDeleteProgram(Detector->Program);
     glDeleteQueries(1, &Detector->Query);
-    glDeleteBuffers(1, &Detector->SSBO);
+    DeleteShaderBuffer(Detector->ShaderBuffer);
     free(Detector);
 }

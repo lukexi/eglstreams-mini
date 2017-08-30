@@ -21,7 +21,7 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "quad.h"
 #include "texture.h"
 #include "mvar.h"
-#include "buffered-texture.h"
+#include "texture-buffer.h"
 #include "global-state.h"
 
 
@@ -65,7 +65,7 @@ int main() {
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
 
 
-    buffered_texture* CameraBufTex = CreateBufferedTexture(CameraWidth, CameraHeight, CameraChannels);
+    texture_buffer* CameraBufTex = CreateBufferedTexture(CameraWidth, CameraHeight, CameraChannels);
 
     // Camera setup
     mvar* CameraMVar = CreateMVar(free);

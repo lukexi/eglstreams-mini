@@ -2,7 +2,11 @@
 #define DOTDETECTOR_H
 
 #include "dotframe.h"
-#include "buffered-texture.h"
+#include "shader-buffer.h"
+
+#ifndef PMB_SIZE
+#define PMB_SIZE 3
+#endif
 
 #define MAX_DOTS 16384
 
@@ -23,14 +27,8 @@ typedef struct {
 
 typedef struct {
     GLuint Program;
-    GLuint SSBO;
     GLuint Query;
-    void* SSBOMemory;
-    GLsync Syncs[PMB_SIZE];
-    int WriteIndex;
-    int ReadIndex;
-    size_t ElementSize;
-    size_t AlignedElementSize;
+    shader_buffer* ShaderBuffer;
 } dotdetector_state;
 
 dotdetector_state* InitializeDotDetector ();

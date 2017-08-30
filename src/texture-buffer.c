@@ -1,8 +1,8 @@
 #include <GL/glew.h>
 #include <stdio.h>
 #include <memory.h>
-#include "buffered-texture.h"
 #include "texture.h"
+#include "texture-buffer.h"
 
 void WaitSync(GLsync Sync) {
     if (!Sync) {
@@ -25,14 +25,14 @@ void LockSync(GLsync* Sync) {
 
 
 // e.g.
-buffered_texture* CreateBufferedTexture(int Width, int Height, int Channels) {
+texture_buffer* CreateBufferedTexture(int Width, int Height, int Channels) {
     const int TextureSizeInBytes = Width * Height * Channels;
 
     const int BufferCount = PMB_SIZE;
     // Total buffer size
     const int MemorySize = BufferCount * TextureSizeInBytes;
 
-    buffered_texture* BufTex = malloc(sizeof(buffered_texture));
+    texture_buffer* BufTex = malloc(sizeof(texture_buffer));
 
     GLuint PBO; // Pixel Buffer Object
     glCreateBuffers(1, &PBO);
@@ -60,7 +60,7 @@ buffered_texture* CreateBufferedTexture(int Width, int Height, int Channels) {
 
 
 
-void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
+void UploadToBufferedTexture(texture_buffer* BufTex, uint8_t* Data) {
 
     // Wait for the sync associated with this buffer
     WaitSync(BufTex->Syncs[BufTex->WriteIndex]);
@@ -103,6 +103,6 @@ void UploadToBufferedTexture(buffered_texture* BufTex, uint8_t* Data) {
     BufTex->ReadIndex  = (WrittenIndex + 2) % PMB_SIZE;
 }
 
-GLuint GetReadableTexture(buffered_texture* BufTex) {
+GLuint GetReadableTexture(texture_buffer* BufTex) {
     return BufTex->Textures[BufTex->ReadIndex];
 }
