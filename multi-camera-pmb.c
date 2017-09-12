@@ -49,7 +49,20 @@ void* CameraThreadMain(void* Args) {
 
     if (CameraState == NULL) Fatal("Couldn't find a camera : (\n");
 
+    camera_set_ctrl_by_name(CameraState, "exposure_auto", 1);
+    int ExposureMin, ExposureMax;
+    camera_get_ctrl_bounds_by_name(CameraState, "exposure_absolute", &ExposureMin, &ExposureMax);
+    int ExposureScale = ExposureMax - ExposureMin;
+
+
+    printf("Min: %i Max: %i Scale: %i\n", ExposureMin, ExposureMax, ExposureScale);
     while (1) {
+
+        float Y = (sin(GetTime()) * 0.5 + 0.5);
+        Y = 0.1 + Y*0.1;
+        camera_set_ctrl_by_name(CameraState, "exposure_absolute", ExposureMin + Y * ExposureScale);
+        // printf("Setting to %f\n", ExposureMin + Y * ExposureScale);
+
         uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
         camera_capture(CameraState, CameraBuffer);
         TryWriteMVar(Info->ImageMVar, CameraBuffer);
@@ -96,7 +109,12 @@ int main() {
     CreateCamera(&CameraInfos[1], "/dev/video1");
     CreateCamera(&CameraInfos[2], "/dev/video2");
 
-    glClearColor(1, 1, 1, 1);
+    // glClearColor(1, 1, 1, 1);
+    glClearColor(
+                (sin(GetTime()*3)/2+0.5) * 0.8,
+                (sin(GetTime()*5)/2+0.5) * 0.8,
+                (sin(GetTime()*7)/2+0.5) * 0.8,
+                1);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(FullscreenQuadProgram);
     glBindVertexArray(FullscreenQuadVAO);
@@ -119,11 +137,11 @@ int main() {
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 
-        NEWTIME(Swap);
+        // NEWTIME(Swap);
         eglSwapBuffers(
             Display->DisplayDevice,
             Display->Surface);
-        GRAPHTIME(Swap, "+");
+        // GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
     }
 
