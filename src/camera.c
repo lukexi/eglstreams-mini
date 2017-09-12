@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <turbojpeg.h>
+#include "camera.h"
 
 
 
@@ -36,6 +37,9 @@ static void tick(char* str) {
 
 typedef enum { NO_RETRY = 0, RETRY = 1 } retry_t;
 
+// ioctl with:
+// 1. automatic retries on EINTR
+// 2. optionally, automatically retries on EAGAIN
 static int xioctl (int fh, int request, void *arg, retry_t should_retry) {
     int r;
 
@@ -46,27 +50,15 @@ static int xioctl (int fh, int request, void *arg, retry_t should_retry) {
     return r;
 }
 
-static void xioctl_or_exit (int fh, int request, void *arg, retry_t should_retry) {
+// xioctl, but exit on legit errors
+static void xioctl_or_exit (int fh, int request, void *arg, retry_t should_retry, const char* msg, const char* name) {
     int r = xioctl(fh, request, arg, should_retry);
 
     if (r == -1) {
-        fprintf(stderr, "ioctl error %d: %s\n", errno, strerror(errno));
+        fprintf(stderr, "ioctl error %d: %s (%s) (on camera %s)\n", errno, strerror(errno), msg, name);
         exit(EXIT_FAILURE);
     }
 }
-
-typedef struct {
-    void   *start;  // location where buffer is mapped into process memory
-    size_t length;  // length of buffer
-} buffer;
-
-typedef struct {
-    int                is_async;   // whether camera is in async mode
-    const char         *dev_name;  // device file-name (like /dev/video0)
-    int                fd;         // file descriptor for opened device
-    buffer*            bufs;       // information about buffers
-    size_t             num_bufs;   // number of buffers
-} camera_state;
 
 const enum v4l2_buf_type BUF_TYPE = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -79,7 +71,7 @@ static int error(const char *format, ...) {
 }
 void camera_close (camera_state* cam) {
     // Close & deallocate device resources
-    xioctl_or_exit(cam->fd, VIDIOC_STREAMOFF, (void *)&BUF_TYPE, RETRY);
+    xioctl_or_exit(cam->fd, VIDIOC_STREAMOFF, (void *)&BUF_TYPE, RETRY, "VIDIOC_STREAMOFF", cam->dev_name);
     for (int i = 0; i < cam->num_bufs; i++) {
         munmap(cam->bufs[i].start, cam->bufs[i].length);
     }
@@ -93,9 +85,11 @@ void camera_close (camera_state* cam) {
 
 
 
-camera_state* camera_open(char* dev_name, int width, int height, double fps, int is_async) {
+camera_state* camera_open(char* name, char* dev_name, int width, int height, double fps, int is_async) {
+    printf("camera_open got fps %f\n", fps);
     camera_state* cam = (camera_state*)calloc(1, sizeof(camera_state));
-    cam->dev_name = strcpy(malloc(strlen(dev_name)), dev_name);
+    cam->name = strdup(name);
+    cam->dev_name = strdup(dev_name);
     cam->is_async = is_async;
 
     // Open device to get file descriptor (O_NONBLOCK means VIDIOC_DQBUF won't block)
@@ -112,7 +106,7 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
     fmt.fmt.pix.height      = height;
     fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
     fmt.fmt.pix.field       = V4L2_FIELD_INTERLACED;
-    xioctl_or_exit(cam->fd, VIDIOC_S_FMT, &fmt, RETRY);
+    xioctl_or_exit(cam->fd, VIDIOC_S_FMT, &fmt, RETRY, "VIDIOC_S_FMT", cam->name);
     if (fmt.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
         error("Camera changed 'MJPG' format to '%.*s'\n",
               4, (char*)&fmt.fmt.pix.pixelformat);
@@ -131,7 +125,7 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
     req.count                      = cam->num_bufs;
     req.type                       = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory                     = V4L2_MEMORY_MMAP;
-    xioctl_or_exit(cam->fd, VIDIOC_REQBUFS, &req, RETRY);
+    xioctl_or_exit(cam->fd, VIDIOC_REQBUFS, &req, RETRY, "VIDIOC_REQBUFS", cam->name);
 
     // Map buffers into application memory
     cam->bufs = calloc(cam->num_bufs, sizeof(buffer));
@@ -140,7 +134,7 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
         buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
         buf.index  = i;
-        xioctl_or_exit(cam->fd, VIDIOC_QUERYBUF, (void*)&buf, RETRY);
+        xioctl_or_exit(cam->fd, VIDIOC_QUERYBUF, (void*)&buf, RETRY, "VIDIOC_QUERYBUF", cam->name);
         cam->bufs[i].length = buf.length;
         cam->bufs[i].start = mmap(NULL,
             buf.length,
@@ -156,9 +150,8 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
     struct v4l2_streamparm parm = { 0 };
     parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     parm.parm.capture.timeperframe.numerator = 1000;
-    parm.parm.capture.timeperframe.denominator =
-    fps * parm.parm.capture.timeperframe.numerator;
-    xioctl_or_exit(cam->fd, VIDIOC_S_PARM, &parm, RETRY);
+    parm.parm.capture.timeperframe.denominator = fps * parm.parm.capture.timeperframe.numerator;
+    xioctl_or_exit(cam->fd, VIDIOC_S_PARM, &parm, RETRY, "VIDIOC_S_PARM", cam->name);
     struct v4l2_fract *tf = &parm.parm.capture.timeperframe;
     printf("fps is set to %f\n", ((double)tf->denominator) / tf->numerator);
 
@@ -169,7 +162,7 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
             buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index  = i;
-            xioctl_or_exit(cam->fd, VIDIOC_QBUF, (void*)&buf, RETRY);
+            xioctl_or_exit(cam->fd, VIDIOC_QBUF, (void*)&buf, RETRY, "VIDIOC_QBUF", cam->name);
         }
     }
 
@@ -180,7 +173,7 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
             camera_close(cam);
             error("While turning on stream: No space left on device\n");
         } else {
-            fprintf(stderr, "ioctl error %d: %s\n", errno, strerror(errno));
+            fprintf(stderr, "ioctl error %d: %s (VIDIOC_STREAMON) (on camera %s)\n", errno, strerror(errno), cam->name);
             exit(EXIT_FAILURE);
         }
     }
@@ -190,34 +183,6 @@ camera_state* camera_open(char* dev_name, int width, int height, double fps, int
     // njInit();
 
     return cam;
-}
-
-camera_state* camera_open_any(int width, int height, double fps, int is_async) {
-    char device_name[32];
-    const int num_tries = 16;
-    for (int i = 0; i < num_tries; i++) {
-        sprintf(device_name, "/dev/video%i", i);
-        camera_state* camera = camera_open(device_name, width, height, fps, is_async);
-        if (camera != NULL) {
-            printf("Opened %s\n", device_name);
-            return camera;
-        }
-    }
-    return NULL;
-}
-
-int camera_open_all(int width, int height, double fps, int is_async, camera_state** cameras, int num_cameras) {
-    char device_name[32];
-    int num_found = 0;
-    for (int i = 0; i < num_cameras; i++) {
-        sprintf(device_name, "/dev/video%i", i);
-        camera_state* camera = camera_open(device_name, width, height, fps, is_async);
-        if (camera != NULL) {
-            cameras[i] = camera;
-            num_found++;
-        }
-    }
-    return num_found;
 }
 
 // Waits for one of `cam`'s buffers to queued for reading by the
@@ -235,9 +200,9 @@ static void sync_dqbuf(camera_state* cam, struct v4l2_buffer* buf) {
         r = select(cam->fd + 1, &fds, NULL, NULL, &tv);
     } while ((r == -1 && (errno == EINTR)));
     if (r == -1) {
-        error("During select: %s\n", strerror(errno));
+        error("During select: %s (camera %s)\n", strerror(errno), cam->name);
     } else if (r == 0) {
-        error("During select, timeout!\n");
+        error("During select, timeout! (camera %s)\n", cam->name);
     }
 
     buf->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -276,11 +241,17 @@ void camera_capture(camera_state* cam, void* out_buf) {
                         break;
                     }
                 } else {  // a genuine ioctl error
-                    fprintf(stderr, "ioctl error %d: %s\n", errno, strerror(errno));
+                    fprintf(stderr, "ioctl error %d: %s (VIDIOC_DQBUF) (on camera %s)\n", errno, strerror(errno), cam->name);
                     exit(EXIT_FAILURE);
                 }
             } else {  // ioctl success; cur_buf is a dequeued buffer
-                if (prev_buf.bytesused) xioctl_or_exit(cam->fd, VIDIOC_QBUF, &prev_buf, RETRY);
+                if (prev_buf.bytesused) {
+                    int r = xioctl(cam->fd, VIDIOC_QBUF, &prev_buf, RETRY);
+                    if (r == -1) {
+                        printf("WARNING: Failure to VIDIOC_QBUF (loc 1)\n");
+                        printf("Camera: %s\n", cam->name);
+                    }
+                }
                 prev_buf = cur_buf;
             }
         }
@@ -312,54 +283,74 @@ void camera_capture(camera_state* cam, void* out_buf) {
 
     if (cam->is_async) {
         // Re-enqueue dequeued buffer
-        xioctl_or_exit(cam->fd, VIDIOC_QBUF, &buf_to_read, RETRY);
+        int r = xioctl(cam->fd, VIDIOC_QBUF, &buf_to_read, RETRY);
+        if (r == -1) {
+            printf("WARNING: Failure to VIDIOC_QBUF (loc 2)\n");
+            printf("Camera: %s\n", cam->name);
+        }
     }
 }
 
 
-// Assigns ctrl_id & ctrl_class based on name, or return 0 if name is not recognized.
-int ctrl_info_by_name(char* name, int *ctrl_id, int *ctrl_class) {
-    *ctrl_class = V4L2_CTRL_CLASS_USER;
-    if (strcmp(name, "brightness") == 0)                     { *ctrl_id = V4L2_CID_BRIGHTNESS;                return 1; }
-    if (strcmp(name, "contrast") == 0)                       { *ctrl_id = V4L2_CID_CONTRAST;                  return 1; }
-    if (strcmp(name, "saturation") == 0)                     { *ctrl_id = V4L2_CID_SATURATION;                return 1; }
-    if (strcmp(name, "white_balance_temperature_auto") == 0) { *ctrl_id = V4L2_CID_AUTO_WHITE_BALANCE;        return 1; }
-    if (strcmp(name, "gain") == 0)                           { *ctrl_id = V4L2_CID_GAIN;                      return 1; }
-    if (strcmp(name, "power_line_frequency") == 0)           { *ctrl_id = V4L2_CID_POWER_LINE_FREQUENCY;      return 1; }
-    if (strcmp(name, "white_balance_temperature") == 0)      { *ctrl_id = V4L2_CID_WHITE_BALANCE_TEMPERATURE; return 1; }
-    if (strcmp(name, "sharpness") == 0)                      { *ctrl_id = V4L2_CID_SHARPNESS;                 return 1; }
-    if (strcmp(name, "backlight_compensation") == 0)         { *ctrl_id = V4L2_CID_BACKLIGHT_COMPENSATION;    return 1; }
+// Returns control id for a name, or -1 if the name is not recognized.
+int ctrl_info_by_name(char* name) {
+    if (strcmp(name, "brightness") == 0)                     { return V4L2_CID_BRIGHTNESS; }
+    if (strcmp(name, "contrast") == 0)                       { return V4L2_CID_CONTRAST; }
+    if (strcmp(name, "saturation") == 0)                     { return V4L2_CID_SATURATION; }
+    if (strcmp(name, "white_balance_temperature_auto") == 0) { return V4L2_CID_AUTO_WHITE_BALANCE; }
+    if (strcmp(name, "gain") == 0)                           { return V4L2_CID_GAIN; }
+    if (strcmp(name, "power_line_frequency") == 0)           { return V4L2_CID_POWER_LINE_FREQUENCY; }
+    if (strcmp(name, "white_balance_temperature") == 0)      { return V4L2_CID_WHITE_BALANCE_TEMPERATURE; }
+    if (strcmp(name, "sharpness") == 0)                      { return V4L2_CID_SHARPNESS; }
+    if (strcmp(name, "backlight_compensation") == 0)         { return V4L2_CID_BACKLIGHT_COMPENSATION; }
 
-    *ctrl_class = V4L2_CTRL_CLASS_CAMERA;
-    if (strcmp(name, "exposure_auto") == 0)          { *ctrl_id = V4L2_CID_EXPOSURE_AUTO;          return 1; }
-    if (strcmp(name, "exposure_absolute") == 0)      { *ctrl_id = V4L2_CID_EXPOSURE_ABSOLUTE;      return 1; }
-    if (strcmp(name, "exposure_auto_priority") == 0) { *ctrl_id = V4L2_CID_EXPOSURE_AUTO_PRIORITY; return 1; }
-    if (strcmp(name, "pan_absolute") == 0)           { *ctrl_id = V4L2_CID_PAN_ABSOLUTE;           return 1; }
-    if (strcmp(name, "tilt_absolute") == 0)          { *ctrl_id = V4L2_CID_TILT_ABSOLUTE;          return 1; }
-    if (strcmp(name, "focus_absolute") == 0)         { *ctrl_id = V4L2_CID_FOCUS_ABSOLUTE;         return 1; }
-    if (strcmp(name, "focus_auto") == 0)             { *ctrl_id = V4L2_CID_FOCUS_AUTO;             return 1; }
-    if (strcmp(name, "zoom_absolute") == 0)          { *ctrl_id = V4L2_CID_ZOOM_ABSOLUTE;          return 1; }
+    if (strcmp(name, "exposure_auto") == 0)          { return V4L2_CID_EXPOSURE_AUTO; }
+    if (strcmp(name, "exposure_absolute") == 0)      { return V4L2_CID_EXPOSURE_ABSOLUTE; }
+    if (strcmp(name, "exposure_auto_priority") == 0) { return V4L2_CID_EXPOSURE_AUTO_PRIORITY; }
+    if (strcmp(name, "pan_absolute") == 0)           { return V4L2_CID_PAN_ABSOLUTE; }
+    if (strcmp(name, "tilt_absolute") == 0)          { return V4L2_CID_TILT_ABSOLUTE; }
+    if (strcmp(name, "focus_absolute") == 0)         { return V4L2_CID_FOCUS_ABSOLUTE; }
+    if (strcmp(name, "focus_auto") == 0)             { return V4L2_CID_FOCUS_AUTO; }
+    if (strcmp(name, "zoom_absolute") == 0)          { return V4L2_CID_ZOOM_ABSOLUTE; }
 
-    return 0;
+    return -1;
 }
 
 int camera_set_ctrl_by_name(camera_state* cam, char* name, int value) {
-    int ctrl_id, ctrl_class;
-    if (!ctrl_info_by_name(name, &ctrl_id, &ctrl_class)) return 0;
+    int ctrl_id = ctrl_info_by_name(name);
+    if (ctrl_id == -1) return 0;
 
-    struct v4l2_ext_control ctrl = { 0 };
-    ctrl.id = ctrl_id;
-    ctrl.size = 0;
-    ctrl.value = value;
+    struct v4l2_control ctrl = { .id = ctrl_id, .value = value };
 
-    struct v4l2_ext_control ctrl_array[] = { ctrl };
+    int r = xioctl(cam->fd, VIDIOC_S_CTRL, &ctrl, RETRY);
+    if (r == -1) {
+        printf("WARNING: Failure to VIDIOC_S_CTRL\n");
+        printf("Camera: %s\n", cam->name);
+    }
 
-    struct v4l2_ext_controls ctrls = { { 0 } };
-    ctrls.controls = ctrl_array;
-    ctrls.count = 1;
-    ctrls.ctrl_class = ctrl_class;
+    return 1;
+}
 
-    xioctl_or_exit(cam->fd, VIDIOC_S_EXT_CTRLS, &ctrls, RETRY);
+int camera_get_ctrl_by_name(camera_state* cam, char* name) {
+    int ctrl_id = ctrl_info_by_name(name);
+    if (ctrl_id == -1) return -1;
+
+    struct v4l2_control ctrl = { .id = ctrl_id };
+    xioctl_or_exit(cam->fd, VIDIOC_G_CTRL, &ctrl, RETRY, "VIDIOC_G_CTRL", cam->name);
+
+    return ctrl.value;
+}
+
+int camera_get_ctrl_bounds_by_name(camera_state* cam, char* name, int* min, int* max) {
+    int ctrl_id = ctrl_info_by_name(name);
+    if (ctrl_id == -1) return 0;
+
+    struct v4l2_queryctrl queryctrl;
+    queryctrl.id = ctrl_id;
+    xioctl_or_exit(cam->fd, VIDIOC_QUERYCTRL, &queryctrl, RETRY, "VIDIOC_QUERYCTRL", cam->name);
+
+    *min = queryctrl.minimum;
+    *max = queryctrl.maximum;
 
     return 1;
 }

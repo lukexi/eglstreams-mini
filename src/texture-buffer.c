@@ -11,7 +11,7 @@ void WaitSync(GLsync Sync) {
     }
     while (1) {
         GLenum WaitResult = glClientWaitSync(Sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000);
-        printf("Is sync? %i\n", glIsSync(Sync));
+        // printf("Is sync? %i\n", glIsSync(Sync));
         if (WaitResult == GL_ALREADY_SIGNALED ||
             WaitResult == GL_CONDITION_SATISFIED ||
             WaitResult == GL_WAIT_FAILED) {

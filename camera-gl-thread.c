@@ -44,7 +44,7 @@ void* CameraThreadMain(void* Args) {
 
     // Camera setup
     int IsAsync = 1;
-    camera_state* CameraState = camera_open_any(CameraWidth, CameraHeight, CameraFPS, IsAsync);
+    camera_state* CameraState = camera_open("Video0", "/dev/video0", CameraWidth, CameraHeight, CameraFPS, IsAsync);
     if (CameraState == NULL) {
         Fatal("Couldn't find a camera : (\n");
     }

@@ -22,12 +22,12 @@ Each display uses its own OpenGL context
 int main() {
     egl_state* EGL = SetupEGL();
 
-    GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
-        "shaders/basic.vert",
-        "shaders/shaded.frag"
-        );
+    // GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
+    //     "shaders/basic.vert",
+    //     "shaders/shaded.frag"
+    //     );
 
-    GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+    // GLuint FullscreenQuadVAO = CreateFullscreenQuad();
     fps FPS = MakeFPS("Display Thread");
     while (1) {
         for (int D = 0; D < EGL->DisplaysCount; D++) {
