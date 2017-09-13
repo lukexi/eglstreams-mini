@@ -34,13 +34,16 @@ static void tick(char* str) {
     last_time = now;
 }
 
+static void exit_with_shutdown(camera_state* cam) {
+
+}
 
 typedef enum { NO_RETRY = 0, RETRY = 1 } retry_t;
 
 // ioctl with:
 // 1. automatic retries on EINTR
 // 2. optionally, automatically retries on EAGAIN
-static int xioctl (int fh, int request, void *arg, retry_t should_retry) {
+static int xioctl(int fh, int request, void *arg, retry_t should_retry) {
     int r;
 
     do {
@@ -51,7 +54,14 @@ static int xioctl (int fh, int request, void *arg, retry_t should_retry) {
 }
 
 // xioctl, but exit on legit errors
-static void xioctl_or_exit (int fh, int request, void *arg, retry_t should_retry, const char* msg, const char* name) {
+static void xioctl_or_exit(
+    int fh,
+    int request,
+    void *arg,
+    retry_t should_retry,
+    const char* msg,
+    const char* name)
+{
     int r = xioctl(fh, request, arg, should_retry);
 
     if (r == -1) {
@@ -60,18 +70,46 @@ static void xioctl_or_exit (int fh, int request, void *arg, retry_t should_retry
     }
 }
 
+
 const enum v4l2_buf_type BUF_TYPE = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-static int error(const char *format, ...) {
+static int camera_error(camera_state* cam, const char *format, ...) {
     va_list args;
     va_start(args, format);
     fprintf(stderr, format, args);
     va_end(args);
+
+    camera_close(cam);
+
     exit(EXIT_FAILURE);
 }
-void camera_close (camera_state* cam) {
+
+// xioctl, but clean up camera first
+static void xioctl_cam_or_exit(
+    camera_state* cam,
+    int request,
+    void *arg,
+    retry_t should_retry,
+    const char* msg)
+{
+    int r = xioctl(cam->fd, request, arg, should_retry);
+
+    if (r == -1) {
+        camera_error(cam, "ioctl error %d: %s (%s) (on camera %s)\n", errno, strerror(errno), msg, cam->name);
+    }
+}
+
+
+static void camera_streamoff(camera_state* cam) {
+    int r = xioctl(cam->fd, VIDIOC_STREAMOFF, (void *)&BUF_TYPE, RETRY);
+    if (r == -1) {
+        printf("Error during VIDIOC_STREAMOFF for cam %s\n", cam->dev_name);
+    }
+}
+
+void camera_close(camera_state* cam) {
     // Close & deallocate device resources
-    xioctl_or_exit(cam->fd, VIDIOC_STREAMOFF, (void *)&BUF_TYPE, RETRY, "VIDIOC_STREAMOFF", cam->dev_name);
+    camera_streamoff(cam);
     for (int i = 0; i < cam->num_bufs; i++) {
         munmap(cam->bufs[i].start, cam->bufs[i].length);
     }
@@ -99,6 +137,8 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
         return NULL;
     }
 
+    camera_streamoff(cam);
+
     // Set image format
     struct v4l2_format fmt;
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -106,13 +146,14 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
     fmt.fmt.pix.height      = height;
     fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
     fmt.fmt.pix.field       = V4L2_FIELD_INTERLACED;
-    xioctl_or_exit(cam->fd, VIDIOC_S_FMT, &fmt, RETRY, "VIDIOC_S_FMT", cam->name);
+    xioctl_cam_or_exit(cam, VIDIOC_S_FMT, &fmt, RETRY, "VIDIOC_S_FMT");
+
     if (fmt.fmt.pix.pixelformat != V4L2_PIX_FMT_MJPEG) {
-        error("Camera changed 'MJPG' format to '%.*s'\n",
+        camera_error(cam, "Camera changed 'MJPG' format to '%.*s'\n",
               4, (char*)&fmt.fmt.pix.pixelformat);
     }
     if ((fmt.fmt.pix.width != width) || (fmt.fmt.pix.height != height)) {
-        error("Camera changed %d x %d size to %d x %d\n",
+        camera_error(cam, "Camera changed %d x %d size to %d x %d\n",
               width, height,
               fmt.fmt.pix.width, fmt.fmt.pix.height);
     }
@@ -125,7 +166,8 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
     req.count                      = cam->num_bufs;
     req.type                       = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory                     = V4L2_MEMORY_MMAP;
-    xioctl_or_exit(cam->fd, VIDIOC_REQBUFS, &req, RETRY, "VIDIOC_REQBUFS", cam->name);
+    xioctl_cam_or_exit(cam, VIDIOC_REQBUFS, &req, RETRY, "VIDIOC_REQBUFS");
+
 
     // Map buffers into application memory
     cam->bufs = calloc(cam->num_bufs, sizeof(buffer));
@@ -134,7 +176,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
         buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
         buf.index  = i;
-        xioctl_or_exit(cam->fd, VIDIOC_QUERYBUF, (void*)&buf, RETRY, "VIDIOC_QUERYBUF", cam->name);
+        xioctl_cam_or_exit(cam, VIDIOC_QUERYBUF, (void*)&buf, RETRY, "VIDIOC_QUERYBUF");
         cam->bufs[i].length = buf.length;
         cam->bufs[i].start = mmap(NULL,
             buf.length,
@@ -142,7 +184,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
             cam->fd, buf.m.offset);
         if (MAP_FAILED == cam->bufs[i].start) {
             // TODO: cleanup?
-            error("During mmap: %s\n", strerror(errno));
+            camera_error(cam, "During mmap: %s\n", strerror(errno));
         }
     }
 
@@ -151,7 +193,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
     parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     parm.parm.capture.timeperframe.numerator = 1000;
     parm.parm.capture.timeperframe.denominator = fps * parm.parm.capture.timeperframe.numerator;
-    xioctl_or_exit(cam->fd, VIDIOC_S_PARM, &parm, RETRY, "VIDIOC_S_PARM", cam->name);
+    xioctl_cam_or_exit(cam, VIDIOC_S_PARM, &parm, RETRY, "VIDIOC_S_PARM");
     struct v4l2_fract *tf = &parm.parm.capture.timeperframe;
     printf("fps is set to %f\n", ((double)tf->denominator) / tf->numerator);
 
@@ -162,7 +204,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
             buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index  = i;
-            xioctl_or_exit(cam->fd, VIDIOC_QBUF, (void*)&buf, RETRY, "VIDIOC_QBUF", cam->name);
+            xioctl_cam_or_exit(cam, VIDIOC_QBUF, (void*)&buf, RETRY, "VIDIOC_QBUF");
         }
     }
 
@@ -170,11 +212,9 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
     int r = xioctl(cam->fd, VIDIOC_STREAMON, (void *)&BUF_TYPE, RETRY);
     if (r == -1) {
         if (errno == 28) {  // "No space left on device"
-            camera_close(cam);
-            error("While turning on stream: No space left on device\n");
+            camera_error(cam, "While turning on stream: No space left on device\n");
         } else {
-            fprintf(stderr, "ioctl error %d: %s (VIDIOC_STREAMON) (on camera %s)\n", errno, strerror(errno), cam->name);
-            exit(EXIT_FAILURE);
+            camera_error(cam, "ioctl error %d: %s (VIDIOC_STREAMON) (on camera %s)\n", errno, strerror(errno), cam->name);
         }
     }
 
@@ -187,7 +227,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
 
 // Waits for one of `cam`'s buffers to queued for reading by the
 // driver, then dequeues it into `buf`.
-static void sync_dqbuf(camera_state* cam, struct v4l2_buffer* buf) {
+static void sync_dqbuf(camera_state* cam, struct v4l2_buffer* buf, int num_retries) {
     tick("sync_dqbuf start");
     fd_set fds;
     FD_ZERO(&fds);
@@ -200,9 +240,16 @@ static void sync_dqbuf(camera_state* cam, struct v4l2_buffer* buf) {
         r = select(cam->fd + 1, &fds, NULL, NULL, &tv);
     } while ((r == -1 && (errno == EINTR)));
     if (r == -1) {
-        error("During select: %s (camera %s)\n", strerror(errno), cam->name);
+        camera_error(cam, "During select: %s (camera %s)\n", strerror(errno), cam->name);
     } else if (r == 0) {
-        error("During select, timeout! (camera %s)\n", cam->name);
+        if (num_retries > 0) {
+            printf("Select timeout on camera %s, retrying %i more times...\n", cam->name, num_retries);
+            sync_dqbuf(cam, buf, num_retries - 1);
+        } else {
+            camera_error(cam, "During select, timeout! (camera %s)\n", cam->name);
+        }
+
+
     }
 
     buf->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -237,12 +284,11 @@ void camera_capture(camera_state* cam, void* out_buf) {
                     } else {
                         // no buffer to dequeue and no previous buffer; wait for one
                         // printf("no buffer ready; gotta wait\n");
-                        sync_dqbuf(cam, &buf_to_read);
+                        sync_dqbuf(cam, &buf_to_read, 10);
                         break;
                     }
                 } else {  // a genuine ioctl error
-                    fprintf(stderr, "ioctl error %d: %s (VIDIOC_DQBUF) (on camera %s)\n", errno, strerror(errno), cam->name);
-                    exit(EXIT_FAILURE);
+                    camera_error(cam, "ioctl error %d: %s (VIDIOC_DQBUF) (on camera %s)\n", errno, strerror(errno), cam->name);
                 }
             } else {  // ioctl success; cur_buf is a dequeued buffer
                 if (prev_buf.bytesused) {
@@ -264,7 +310,7 @@ void camera_capture(camera_state* cam, void* out_buf) {
         xioctl(cam->fd, VIDIOC_QBUF, &buf, RETRY);
 
         // Dequeue buffer
-        sync_dqbuf(cam, &buf_to_read);
+        sync_dqbuf(cam, &buf_to_read, 10);
     }
 
     tick("gonna decode...");
