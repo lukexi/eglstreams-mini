@@ -34,10 +34,6 @@ static void tick(char* str) {
     last_time = now;
 }
 
-static void exit_with_shutdown(camera_state* cam) {
-
-}
-
 typedef enum { NO_RETRY = 0, RETRY = 1 } retry_t;
 
 // ioctl with:
@@ -137,7 +133,7 @@ camera_state* camera_open(char* name, char* dev_name, int width, int height, dou
         return NULL;
     }
 
-    camera_streamoff(cam);
+    // camera_streamoff(cam);
 
     // Set image format
     struct v4l2_format fmt;

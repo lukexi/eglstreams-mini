@@ -12,6 +12,7 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include <GL/glew.h>
 #include <math.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "egl.h"
 #include "utils.h"
@@ -37,6 +38,7 @@ camera_info CameraInfos[NUM_CAMERAS];
 void* CameraThreadMain(void* Args) {
     camera_info* Info = (camera_info*)Args;
 
+
     // Camera setup
     int IsAsync = 1;
     camera_state* CameraState = camera_open(
@@ -56,16 +58,24 @@ void* CameraThreadMain(void* Args) {
 
 
     printf("Min: %i Max: %i Scale: %i\n", ExposureMin, ExposureMax, ExposureScale);
+    int FrameCount = 0;
     while (1) {
 
         float Y = (sin(GetTime()) * 0.5 + 0.5);
-        Y = 0.1 + Y*0.1;
+        Y = 0.3 + Y*0.1;
         camera_set_ctrl_by_name(CameraState, "exposure_absolute", ExposureMin + Y * ExposureScale);
         // printf("Setting to %f\n", ExposureMin + Y * ExposureScale);
 
         uint8_t* CameraBuffer = malloc(CameraWidth * CameraHeight * CameraChannels);
         camera_capture(CameraState, CameraBuffer);
         TryWriteMVar(Info->ImageMVar, CameraBuffer);
+
+        FrameCount++;
+        if (FrameCount > 300) {
+            printf("Resetting camera %s...\n", Info->DeviceName);
+            camera_close(CameraState);
+            CameraThreadMain(Args);
+        }
     }
 
     return NULL;
@@ -119,6 +129,7 @@ int main() {
     glUseProgram(FullscreenQuadProgram);
     glBindVertexArray(FullscreenQuadVAO);
 
+    int FrameCount = 0;
     while (1) {
 
         for (int CameraIndex = 0; CameraIndex < NUM_CAMERAS; CameraIndex++) {
@@ -143,6 +154,11 @@ int main() {
             Display->Surface);
         // GRAPHTIME(Swap, "+");
         GLCheck("Display Thread");
+
+        FrameCount++;
+        if (FrameCount == 300) {
+            // raise(SIGSEGV);
+        }
     }
 
     return 0;
