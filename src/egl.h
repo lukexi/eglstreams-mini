@@ -23,9 +23,11 @@
 #if !defined(EGL_H)
 #define EGL_H
 
+#include <stdbool.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include "kms.h"
+#include <xf86drm.h>
 
 typedef struct {
     drm_edid* EDID;
@@ -35,15 +37,19 @@ typedef struct {
     EGLContext Context;
     EGLDisplay DisplayDevice;
     EGLConfig Config;
+    EGLStreamKHR Stream;
+    bool VSyncReady;
 } egl_display;
 
 typedef struct {
-    egl_display* Displays;
-    int DisplaysCount;
-    EGLContext RootContext;
-    EGLDisplay DisplayDevice;
-    EGLDeviceEXT Device;
-    EGLConfig Config;
+    egl_display*    Displays;
+    int             DisplaysCount;
+    EGLContext      RootContext;
+    EGLDisplay      DisplayDevice;
+    EGLDeviceEXT    Device;
+    EGLConfig       Config;
+    int             DRMFD;
+    drmEventContext DRMEventContext;
 } egl_state;
 
 
@@ -79,15 +85,15 @@ egl_display* SetupEGLDisplays(
     EGLConfig eglConfig,
     EGLContext eglContext,
     kms_plane* Planes,
-    int NumPlanes,
-    // If interacting with the displays from a thread,
-    // they must have their own context
-    bool UseContextPerDisplay);
+    int NumPlanes);
 
 void InitGLEW();
 
 void GetEglExtensionFunctionPointers(void);
 
 void EGLCheck(const char* name);
+
+void EGLUpdateVSync(egl_state* EGL);
+void EGLSwapDisplay(egl_display* Display);
 
 #endif /* EGL_H */

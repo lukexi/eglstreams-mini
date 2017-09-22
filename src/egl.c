@@ -38,6 +38,24 @@
 #define EGL_DRM_MASTER_FD_EXT                   0x333C
 #endif
 
+#if !defined(EGL_CONSUMER_AUTO_ACQUIRE_EXT)
+#define EGL_CONSUMER_AUTO_ACQUIRE_EXT         0x332B
+#endif
+
+#if !defined(EGL_DRM_FLIP_EVENT_DATA_NV)
+#define EGL_DRM_FLIP_EVENT_DATA_NV            0x333E
+#endif
+
+#if !defined(EGL_RESOURCE_BUSY_EXT)
+#define EGL_RESOURCE_BUSY_EXT                        0x3353
+#endif
+
+#if !defined(EGL_BAD_STATE_KHR)
+#define EGL_BAD_STATE_KHR                 0x321C
+#endif
+
+typedef EGLBoolean (EGLAPIENTRYP PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC) (EGLDisplay dpy, EGLStreamKHR stream, const EGLAttrib *attrib_list);
+
 /*
  * Check if 'extension' is present in 'extensionString'.  Note that
  * strstr(3) by itself is not sufficient; see:
@@ -84,6 +102,7 @@ static void *GetProcAddress(const char *functionName)
 }
 
 
+
 PFNEGLQUERYDEVICESEXTPROC pEglQueryDevicesEXT = NULL;
 PFNEGLQUERYDEVICESTRINGEXTPROC pEglQueryDeviceStringEXT = NULL;
 PFNEGLGETPLATFORMDISPLAYEXTPROC pEglGetPlatformDisplayEXT = NULL;
@@ -91,6 +110,8 @@ PFNEGLGETOUTPUTLAYERSEXTPROC pEglGetOutputLayersEXT = NULL;
 PFNEGLCREATESTREAMKHRPROC pEglCreateStreamKHR = NULL;
 PFNEGLSTREAMCONSUMEROUTPUTEXTPROC pEglStreamConsumerOutputEXT = NULL;
 PFNEGLCREATESTREAMPRODUCERSURFACEKHRPROC pEglCreateStreamProducerSurfaceKHR = NULL;
+PFNEGLQUERYSTREAMKHRPROC pEglQueryStreamKHR = NULL;
+PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC pEglStreamConsumerAcquireAttribNV = NULL;
 
 void GetEglExtensionFunctionPointers(void)
 {
@@ -114,6 +135,12 @@ void GetEglExtensionFunctionPointers(void)
 
     pEglCreateStreamProducerSurfaceKHR = (PFNEGLCREATESTREAMPRODUCERSURFACEKHRPROC)
         GetProcAddress("eglCreateStreamProducerSurfaceKHR");
+
+    pEglQueryStreamKHR = (PFNEGLQUERYSTREAMKHRPROC)
+        GetProcAddress("eglQueryStreamKHR");
+
+    pEglStreamConsumerAcquireAttribNV = (PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC)
+        GetProcAddress("eglStreamConsumerAcquireAttribNV");
 }
 
 
@@ -233,7 +260,9 @@ int GetDrmFd(EGLDeviceEXT device)
     }
     printf("Device file: %s\n", drmDeviceFile);
 
-    fd = open(drmDeviceFile, O_RDWR, 0);
+    // Open with nonblock so we can query for vsync events
+    // using drmHandleEvent without blocking
+    fd = open(drmDeviceFile, O_RDWR | O_NONBLOCK, 0);
 
     if (fd < 0) {
         Fatal("Unable to open DRM device file.\n");
@@ -384,6 +413,30 @@ EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig) {
     return eglContext;
 }
 
+void EGLUpdateVSync(egl_state* EGL) {
+    drmHandleEvent(EGL->DRMFD, &EGL->DRMEventContext);
+}
+
+void EGLSwapDisplay(egl_display* Display) {
+
+    eglSwapBuffers(Display->DisplayDevice, Display->Surface);
+    // Acquire the new frame,
+    // and pass a data pointer to pass along to drmHandleEvent
+    EGLAttrib AcquireAttribs[] = {
+        EGL_DRM_FLIP_EVENT_DATA_NV, (EGLAttrib)Display,
+        EGL_NONE
+    };
+    EGLBoolean Result = pEglStreamConsumerAcquireAttribNV(
+        Display->DisplayDevice,
+        Display->Stream,
+        AcquireAttribs);
+    if (Result == EGL_FALSE) {
+        EGLCheck("eglStreamConsumerAcquireAttribNV");
+    }
+
+    Display->VSyncReady = false;
+}
+
 /*
  * Set up EGL to present to a DRM KMS plane through an EGLStream.
  */
@@ -391,8 +444,7 @@ egl_display* SetupEGLDisplays(
     EGLDisplay eglDpy,
     EGLConfig eglConfig,
     EGLContext eglContext,
-    kms_plane* Planes, int NumPlanes,
-    bool UseContextPerDisplay)
+    kms_plane* Planes, int NumPlanes)
 {
 
     EGLBoolean ret;
@@ -408,10 +460,14 @@ egl_display* SetupEGLDisplays(
         };
         printf("Setting up plane ID: %i\n", Plane->PlaneID);
 
-        EGLint streamAttribs[] = { EGL_NONE };
+        EGLint streamAttribs[] = {
+            EGL_STREAM_FIFO_LENGTH_KHR, 1,
+            EGL_CONSUMER_AUTO_ACQUIRE_EXT, EGL_FALSE,
+            EGL_NONE,
+        };
 
         EGLint surfaceAttribs[] = {
-            EGL_WIDTH, Plane->Width,
+            EGL_WIDTH,  Plane->Width,
             EGL_HEIGHT, Plane->Height,
             EGL_NONE
         };
@@ -480,26 +536,15 @@ egl_display* SetupEGLDisplays(
          * Make current to the EGLSurface, so that OpenGL rendering is
          * directed to it.
          */
-        EGLContext DisplayContext = eglContext;
-
-        // If interacting with the displays from a thread,
-        // they must have their own context.
-        if (UseContextPerDisplay) {
-            EGLint contextAttribs[] = { EGL_NONE };
-            DisplayContext =
-                eglCreateContext(eglDpy, eglConfig, eglContext, contextAttribs);
-            if (DisplayContext == NULL) {
-                Fatal("eglCreateContext() failed.\n");
-            }
-        }
-
         Displays[PlaneIndex].EDID          = Plane->EDID;
         Displays[PlaneIndex].Width         = Plane->Width;
         Displays[PlaneIndex].Height        = Plane->Height;
         Displays[PlaneIndex].DisplayDevice = eglDpy;
         Displays[PlaneIndex].Surface       = eglSurface;
-        Displays[PlaneIndex].Context       = DisplayContext;
+        Displays[PlaneIndex].Context       = eglContext;
         Displays[PlaneIndex].Config        = eglConfig;
+        Displays[PlaneIndex].Stream        = eglStream;
+        Displays[PlaneIndex].VSyncReady    = true;
     }
 
 
@@ -518,7 +563,17 @@ void InitGLEW() {
     }
 }
 
-egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
+static void PageFlipEventHandler(int fd, unsigned int frame,
+                    unsigned int sec, unsigned int usec,
+                    void *data)
+{
+    egl_display* Display = (egl_display*)data;
+    // printf("EVENT HANDLER %i\n", *IntData);
+    (void)fd; (void)frame; (void)sec; (void)usec; (void)data;
+    Display->VSyncReady = true;
+}
+
+egl_state* SetupEGLInternal() {
     egl_state* EGL = calloc(1, sizeof(egl_state));
 
     // Setup global EGL state
@@ -528,6 +583,7 @@ egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
 
     int drmFd = GetDrmFd(EGL->Device);
 
+    EGL->DRMFD         = drmFd;
     EGL->DisplayDevice = GetEglDisplay(EGL->Device, drmFd);
     EGL->Config        = GetEglConfig(EGL->DisplayDevice);
     EGL->RootContext   = GetEglContext(EGL->DisplayDevice, EGL->Config);
@@ -535,26 +591,30 @@ egl_state* SetupEGLInternal(bool UseContextPerDisplay) {
     // Set up EGL state for each connected display
     kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
     EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice,
-        EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount,
-        UseContextPerDisplay);
+        EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount);
 
     EGLBoolean ret = eglMakeCurrent(EGL->DisplayDevice,
-        EGL_NO_SURFACE, EGL_NO_SURFACE, EGL->RootContext);
+        EGL->Displays->Surface, EGL->Displays->Surface,
+        EGL->RootContext);
     if (!ret) Fatal("Couldn't make main context current\n");
 
     InitGLEW();
+
+    // Create a drmEventContext configured to
+    // call our PageFlipEventHandler function
+    // when a page flip occurs
+    EGL->DRMEventContext.page_flip_handler = PageFlipEventHandler;
+    EGL->DRMEventContext.version           = 2;
 
     return EGL;
 }
 
 egl_state* SetupEGL() {
-    bool UseContextPerDisplay = false;
-    return SetupEGLInternal(UseContextPerDisplay);
+    return SetupEGLInternal();
 }
 
 egl_state* SetupEGLThreaded() {
-    bool UseContextPerDisplay = true;
-    return SetupEGLInternal(UseContextPerDisplay);
+    return SetupEGLInternal();
 }
 
 

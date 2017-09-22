@@ -32,7 +32,7 @@ typedef struct {
 } camera_info;
 
 
-#define NUM_CAMERAS 3
+#define NUM_CAMERAS 1
 camera_info CameraInfos[NUM_CAMERAS];
 
 void* CameraThreadMain(void* Args) {
@@ -96,24 +96,15 @@ void CreateCamera(camera_info* Info, char* DeviceName) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGLThreaded();
-
-    egl_display* Display = &EGL->Displays[0];
-    eglMakeCurrent(Display->DisplayDevice,
-        Display->Surface, Display->Surface,
-        Display->Context);
-    eglSwapInterval(Display->DisplayDevice, 0);
-    glViewport(0, 0, (GLint)Display->Width, (GLint)Display->Height);
-
-    glEnable(GL_BLEND);
-    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    egl_state* EGL = SetupEGL();
 
     GLuint FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",
-        "shaders/textured-trans.frag"
+        "shaders/textured.frag"
         );
+    glUseProgram(FullscreenQuadProgram);
     GLuint FullscreenQuadVAO = CreateFullscreenQuad();
+    glBindVertexArray(FullscreenQuadVAO);
 
     for (int CameraIndex = 0; CameraIndex < NUM_CAMERAS; CameraIndex++) {
         char DeviceName[20];
@@ -122,46 +113,59 @@ int main() {
     }
 
 
-    // glClearColor(1, 1, 1, 1);
-    glClearColor(
-                (sin(GetTime()*3)/2+0.5) * 0.8,
-                (sin(GetTime()*5)/2+0.5) * 0.8,
-                (sin(GetTime()*7)/2+0.5) * 0.8,
-                1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glUseProgram(FullscreenQuadProgram);
-    glBindVertexArray(FullscreenQuadVAO);
 
     int FrameCount = 0;
     while (1) {
 
+        // Update cameras
         for (int CameraIndex = 0; CameraIndex < NUM_CAMERAS; CameraIndex++) {
-
             camera_info* Info = &CameraInfos[CameraIndex];
 
-            // Update camera
             uint8_t* NewCameraBuffer = (uint8_t*)TryReadMVar(Info->ImageMVar);
             if (NewCameraBuffer) {
                 UploadToBufferedTexture(Info->TexBuf, NewCameraBuffer);
                 free(NewCameraBuffer);
             }
-
-            // Draw
-            glBindTexture(GL_TEXTURE_2D, GetReadableTexture(Info->TexBuf));
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 
-        // NEWTIME(Swap);
-        eglSwapBuffers(
-            Display->DisplayDevice,
-            Display->Surface);
-        // GRAPHTIME(Swap, "+");
+        EGLUpdateVSync(EGL);
+
+        for (int DisplayIndex = 0; DisplayIndex < EGL->DisplaysCount; DisplayIndex++) {
+            egl_display* Display = &EGL->Displays[DisplayIndex];
+
+            if (!Display->VSyncReady) {
+                continue;
+            }
+
+            eglMakeCurrent(Display->DisplayDevice,
+                Display->Surface, Display->Surface,
+                Display->Context);
+
+            glViewport(0, 0,
+                (GLint)Display->Width,
+                (GLint)Display->Height);
+
+            // glClearColor(1, 1, 1, 1);
+            glClearColor(
+                        (sin(GetTime()*3)/2+0.5) * 0.8,
+                        (sin(GetTime()*5)/2+0.5) * 0.8,
+                        (sin(GetTime()*7)/2+0.5) * 0.8,
+                        1);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            // Draw cameras round robin
+            camera_info* Camera = &CameraInfos[DisplayIndex % NUM_CAMERAS];
+            glBindTexture(GL_TEXTURE_2D,
+                GetReadableTexture(Camera->TexBuf));
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            // NEWTIME(Swap);
+            EGLSwapDisplay(Display);
+            // GRAPHTIME(Swap, "+");
+        }
+
         GLCheck("Display Thread");
 
-        FrameCount++;
-        if (FrameCount == 300) {
-            // raise(SIGSEGV);
-        }
     }
 
     return 0;
