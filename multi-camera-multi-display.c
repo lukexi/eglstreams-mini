@@ -107,14 +107,16 @@ int main() {
     glBindVertexArray(FullscreenQuadVAO);
 
     for (int CameraIndex = 0; CameraIndex < NUM_CAMERAS; CameraIndex++) {
-        char DeviceName[20];
+        char* DeviceName = calloc(20, sizeof(char));
         sprintf(DeviceName, "/dev/video%i", CameraIndex);
+        printf("Device name: %s\n", DeviceName);
         CreateCamera(&CameraInfos[CameraIndex], DeviceName);
     }
 
 
 
-    int FrameCount = 0;
+    // int FrameCount = 0;
+    fps MainLoopFPS = MakeFPS("Main Loop");
     while (1) {
 
         // Update cameras
@@ -166,6 +168,7 @@ int main() {
 
         GLCheck("Display Thread");
 
+        TickFPS(&MainLoopFPS);
     }
 
     return 0;

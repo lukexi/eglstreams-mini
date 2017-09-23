@@ -582,14 +582,15 @@ egl_state* SetupEGLInternal() {
     EGL->Device = GetEglDevice();
 
     int drmFd = GetDrmFd(EGL->Device);
+    // Set up EGL state for each connected display
+    kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
 
     EGL->DRMFD         = drmFd;
     EGL->DisplayDevice = GetEglDisplay(EGL->Device, drmFd);
     EGL->Config        = GetEglConfig(EGL->DisplayDevice);
     EGL->RootContext   = GetEglContext(EGL->DisplayDevice, EGL->Config);
 
-    // Set up EGL state for each connected display
-    kms_plane* Planes = SetDisplayModes(drmFd, &EGL->DisplaysCount);
+
     EGL->Displays     = SetupEGLDisplays(EGL->DisplayDevice,
         EGL->Config, EGL->RootContext, Planes, EGL->DisplaysCount);
 
