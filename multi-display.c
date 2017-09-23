@@ -17,7 +17,6 @@ The memcpy takes about 1ms, but this otherwise runs well.
 #include "egl.h"
 #include "utils.h"
 
-#include "global-state.h"
 
 
 int main() {
