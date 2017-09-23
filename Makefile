@@ -1,5 +1,5 @@
 INCLUDE_DIRS = -I/usr/include/libdrm -Isrc
-LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm -lturbojpeg -lpthread
+LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm
 
 SHADERS += $(wildcard shaders/*)
 SOURCES += $(wildcard src/*.c)
@@ -17,8 +17,7 @@ CFLAGS += -fPIC
 # Needed for Linux's "perf" to work correctly
 # CFLAGS += -fno-omit-frame-pointer
 
-# MAINS = $(wildcard ./*.c)
-MAINS = ./multi-display.c
+MAINS = $(wildcard ./*.c)
 APPS = $(MAINS:./%.c=./%.app)
 
 all: build/ $(APPS)
