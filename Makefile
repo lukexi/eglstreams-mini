@@ -17,7 +17,8 @@ CFLAGS += -fPIC
 # Needed for Linux's "perf" to work correctly
 # CFLAGS += -fno-omit-frame-pointer
 
-MAINS = $(wildcard ./*.c)
+# MAINS = $(wildcard ./*.c)
+MAINS = ./multi-display.c
 APPS = $(MAINS:./%.c=./%.app)
 
 all: build/ $(APPS)

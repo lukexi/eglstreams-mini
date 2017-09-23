@@ -56,7 +56,6 @@ typedef struct {
 
 // One call to do all of the below
 egl_state* SetupEGL();
-egl_state* SetupEGLThreaded();
 
 // Components of SetupEGL
 
@@ -92,6 +91,7 @@ void InitGLEW();
 void GetEglExtensionFunctionPointers(void);
 
 void EGLCheck(const char* name);
+const char* EGLStreamStateToString(EGLint streamState);
 
 void EGLUpdateVSync(egl_state* EGL);
 void EGLSwapDisplay(egl_display* Display);

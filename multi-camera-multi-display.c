@@ -32,7 +32,7 @@ typedef struct {
 } camera_info;
 
 
-#define NUM_CAMERAS 1
+#define NUM_CAMERAS 2
 camera_info CameraInfos[NUM_CAMERAS];
 
 void* CameraThreadMain(void* Args) {
@@ -116,7 +116,13 @@ int main() {
 
 
     // int FrameCount = 0;
+
     fps MainLoopFPS = MakeFPS("Main Loop");
+    fps* DisplayFPS = calloc(EGL->DisplaysCount, sizeof(fps));
+    for (int DisplayIndex = 0; DisplayIndex < EGL->DisplaysCount; DisplayIndex++) {
+        egl_display* Display = &EGL->Displays[DisplayIndex];
+        DisplayFPS[DisplayIndex] = MakeFPS(Display->EDID->MonitorName);
+    }
     while (1) {
 
         // Update cameras
@@ -164,6 +170,8 @@ int main() {
             // NEWTIME(Swap);
             EGLSwapDisplay(Display);
             // GRAPHTIME(Swap, "+");
+
+            TickFPS(&DisplayFPS[DisplayIndex]);
         }
 
         GLCheck("Display Thread");

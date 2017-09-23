@@ -54,8 +54,9 @@
 #define EGL_BAD_STATE_KHR                 0x321C
 #endif
 
-typedef EGLBoolean (EGLAPIENTRYP PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC) (EGLDisplay dpy, EGLStreamKHR stream, const EGLAttrib *attrib_list);
-
+typedef EGLStreamKHR (EGLAPIENTRYP PFNEGLCREATESTREAMATTRIBNVPROC) (EGLDisplay dpy, const EGLAttrib *attrib_list);
+typedef EGLBoolean   (EGLAPIENTRYP PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC) (EGLDisplay dpy, EGLStreamKHR stream, const EGLAttrib *attrib_list);
+typedef EGLBoolean   (EGLAPIENTRYP PFNEGLSTREAMCONSUMERRELEASEATTRIBNVPROC) (EGLDisplay dpy, EGLStreamKHR stream, const EGLAttrib *attrib_list);
 /*
  * Check if 'extension' is present in 'extensionString'.  Note that
  * strstr(3) by itself is not sufficient; see:
@@ -112,6 +113,8 @@ PFNEGLSTREAMCONSUMEROUTPUTEXTPROC pEglStreamConsumerOutputEXT = NULL;
 PFNEGLCREATESTREAMPRODUCERSURFACEKHRPROC pEglCreateStreamProducerSurfaceKHR = NULL;
 PFNEGLQUERYSTREAMKHRPROC pEglQueryStreamKHR = NULL;
 PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC pEglStreamConsumerAcquireAttribNV = NULL;
+PFNEGLSTREAMCONSUMERRELEASEATTRIBNVPROC pEglStreamConsumerReleaseAttribNV = NULL;
+PFNEGLCREATESTREAMATTRIBNVPROC pEglCreateStreamAttribNV = NULL;
 
 void GetEglExtensionFunctionPointers(void)
 {
@@ -141,6 +144,12 @@ void GetEglExtensionFunctionPointers(void)
 
     pEglStreamConsumerAcquireAttribNV = (PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC)
         GetProcAddress("eglStreamConsumerAcquireAttribNV");
+
+    pEglStreamConsumerReleaseAttribNV = (PFNEGLSTREAMCONSUMERRELEASEATTRIBNVPROC)
+        GetProcAddress("eglStreamConsumerReleaseAttribNV");
+
+    pEglCreateStreamAttribNV = (PFNEGLCREATESTREAMATTRIBNVPROC)
+        GetProcAddress("eglCreateStreamAttribNV");
 }
 
 
@@ -417,15 +426,14 @@ void EGLUpdateVSync(egl_state* EGL) {
     drmHandleEvent(EGL->DRMFD, &EGL->DRMEventContext);
 }
 
-void EGLSwapDisplay(egl_display* Display) {
-
-    eglSwapBuffers(Display->DisplayDevice, Display->Surface);
-    // Acquire the new frame,
+void EGLStreamAcquire(egl_display* Display) {
+    // Ask the Display's EGLStream to acquire the new frame,
     // and pass a data pointer to pass along to drmHandleEvent
     EGLAttrib AcquireAttribs[] = {
         EGL_DRM_FLIP_EVENT_DATA_NV, (EGLAttrib)Display,
         EGL_NONE
     };
+
     EGLBoolean Result = pEglStreamConsumerAcquireAttribNV(
         Display->DisplayDevice,
         Display->Stream,
@@ -433,6 +441,17 @@ void EGLSwapDisplay(egl_display* Display) {
     if (Result == EGL_FALSE) {
         EGLCheck("eglStreamConsumerAcquireAttribNV");
     }
+}
+
+void EGLSwapDisplay(egl_display* Display) {
+
+    NEWTIME(egl);
+    eglSwapBuffers(Display->DisplayDevice, Display->Surface);
+    ENDTIME(egl);
+
+    NEWTIME(acquire);
+    EGLStreamAcquire(Display);
+    ENDTIME(acquire);
 
     Display->VSyncReady = false;
 }
@@ -460,9 +479,10 @@ egl_display* SetupEGLDisplays(
         };
         printf("Setting up plane ID: %i\n", Plane->PlaneID);
 
-        EGLint streamAttribs[] = {
+        EGLAttrib streamAttribs[] = {
             EGL_STREAM_FIFO_LENGTH_KHR, 1,
             EGL_CONSUMER_AUTO_ACQUIRE_EXT, EGL_FALSE,
+            EGL_CONSUMER_ACQUIRE_TIMEOUT_USEC_KHR, 0,
             EGL_NONE,
         };
 
@@ -482,7 +502,7 @@ egl_display* SetupEGLDisplays(
         }
 
         /* Create an EGLStream. */
-        EGLStreamKHR eglStream = pEglCreateStreamKHR(eglDpy, streamAttribs);
+        EGLStreamKHR eglStream = pEglCreateStreamAttribNV(eglDpy, streamAttribs);
 
         if (eglStream == EGL_NO_STREAM_KHR) {
             Fatal("Unable to create stream.\n");
@@ -562,18 +582,23 @@ void InitGLEW() {
         printf("GLEW returned error: %i\n", GLEWError);
     }
 }
+// static void VBlankEventHandler(int fd, unsigned int frame,
+//                     unsigned int sec, unsigned int usec,
+//                     void *data) {
+//     printf("VBLANK\n");
+// }
 
 static void PageFlipEventHandler(int fd, unsigned int frame,
                     unsigned int sec, unsigned int usec,
                     void *data)
 {
     egl_display* Display = (egl_display*)data;
-    // printf("EVENT HANDLER %i\n", *IntData);
+    printf("PAGEFLIP %s\n", Display->EDID->MonitorName);
     (void)fd; (void)frame; (void)sec; (void)usec; (void)data;
     Display->VSyncReady = true;
 }
 
-egl_state* SetupEGLInternal() {
+egl_state* SetupEGL() {
     egl_state* EGL = calloc(1, sizeof(egl_state));
 
     // Setup global EGL state
@@ -601,23 +626,49 @@ egl_state* SetupEGLInternal() {
 
     InitGLEW();
 
+    // Disable EGL VSync
+    // (seems to have no effect)
+    for (int DisplayIndex = 0; DisplayIndex < EGL->DisplaysCount; DisplayIndex++) {
+        egl_display* Display = &EGL->Displays[DisplayIndex];
+        eglMakeCurrent(Display->DisplayDevice,
+            Display->Surface, Display->Surface,
+            Display->Context);
+        eglSwapInterval(Display->DisplayDevice, 0);
+    }
+
     // Create a drmEventContext configured to
     // call our PageFlipEventHandler function
     // when a page flip occurs
     EGL->DRMEventContext.page_flip_handler = PageFlipEventHandler;
+    // EGL->DRMEventContext.vblank_handler    = VBlankEventHandler;
     EGL->DRMEventContext.version           = 2;
 
     return EGL;
 }
 
-egl_state* SetupEGL() {
-    return SetupEGLInternal();
+const char* EGLStreamStateToString(EGLint StreamState) {
+    switch (StreamState) {
+        case EGL_STREAM_STATE_NEW_FRAME_AVAILABLE_KHR:
+            return "EGL_STREAM_STATE_NEW_FRAME_AVAILABLE_KHR";
+            break;
+        case EGL_STREAM_STATE_OLD_FRAME_AVAILABLE_KHR:
+            return "EGL_STREAM_STATE_OLD_FRAME_AVAILABLE_KHR";
+            break;
+        case EGL_STREAM_STATE_CREATED_KHR:
+            return "EGL_STREAM_STATE_CREATED_KHR";
+            break;
+        case EGL_STREAM_STATE_CONNECTING_KHR:
+            return "EGL_STREAM_STATE_CONNECTING_KHR";
+            break;
+        case EGL_STREAM_STATE_EMPTY_KHR:
+            return "EGL_STREAM_STATE_EMPTY_KHR";
+            break;
+        case EGL_STREAM_STATE_DISCONNECTED_KHR:
+            return "EGL_STREAM_STATE_DISCONNECTED_KHR";
+            break;
+    }
+    return "Unrecognized EGL Stream State";
 }
-
-egl_state* SetupEGLThreaded() {
-    return SetupEGLInternal();
-}
-
 
 void EGLCheck(const char* name) {
     EGLint err = eglGetError();

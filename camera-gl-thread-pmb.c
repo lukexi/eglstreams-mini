@@ -130,7 +130,7 @@ void* DisplayThreadMain(void* ThreadArguments) {
 int main() {
     GetTime();
 
-    egl_state* EGL = SetupEGLThreaded();
+    egl_state* EGL = SetupEGL();
 
     FullscreenQuadProgram = CreateVertFragProgramFromPath(
         "shaders/basic.vert",

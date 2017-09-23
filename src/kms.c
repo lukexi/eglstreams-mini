@@ -208,10 +208,6 @@ static bool PickConnector(int drmFd,
             DRM_MODE_OBJECT_CONNECTOR,
             "EDID");
 
-        printf("Got EDID blob %p of size %u.\n",
-               edidBlobPtr->data,
-               edidBlobPtr->length);
-
         // Parse the EDID blob into useful strings
         drm_edid* edid = calloc(1, sizeof(drm_edid));
         int rc = edid_parse(edid,
@@ -220,19 +216,30 @@ static bool PickConnector(int drmFd,
         // Free the blob; we've extracted what we needed.
         drmModeFreePropertyBlob(edidBlobPtr);
 
+        pConfig->edid = edid;
+
         if (!rc) {
-            printf("EDID data '%s', '%s', '%s'\n",
+            printf("Using Display '%s' '%s' Serial# '%s'\n",
                    edid->PNPID,
                    edid->MonitorName,
                    edid->SerialNumber);
         }
 
-        pConfig->edid = edid;
+        for (int ModeIndex = 0; ModeIndex < pConnector->count_modes; ModeIndex++) {
+            printf("Mode %i info: %s clock %i vrefresh %i \n",
+                ModeIndex,
+                pConnector->modes[ModeIndex].name,
+                pConnector->modes[ModeIndex].clock,
+                pConnector->modes[ModeIndex].vrefresh
+            );
+        }
 
-        printf("Connector ID: %i\n", pConfig->connectorID);
-        printf("Connector Index: %i\n", connIndex);
-        printf("Num CRTCS: %i\n", pModeRes->count_crtcs);
-        printf("Num Connectors: %i\n", pModeRes->count_connectors);
+
+
+        printf("Using Connector ID: %i\n", pConfig->connectorID);
+        // printf("Connector Index: %i\n", connIndex);
+        // printf("Num CRTCS: %i\n", pModeRes->count_crtcs);
+        // printf("Num Connectors: %i\n", pModeRes->count_connectors);
         for (int crtcIndex = 0; crtcIndex < pModeRes->count_crtcs; crtcIndex++) {
             if (crtcIndex < connIndex) {
                 continue;
@@ -243,7 +250,7 @@ static bool PickConnector(int drmFd,
             }
 
             pConfig->crtcID = pModeRes->crtcs[crtcIndex];
-            printf("CRTC ID: %i\n", pConfig->crtcID);
+            printf("Using CRTC ID: %i\n", pConfig->crtcID);
             pConfig->crtcIndex = crtcIndex;
             break;
         }
