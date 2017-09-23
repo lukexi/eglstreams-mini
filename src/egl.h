@@ -38,7 +38,7 @@ typedef struct {
     EGLDisplay DisplayDevice;
     EGLConfig Config;
     EGLStreamKHR Stream;
-    bool VSyncReady;
+    bool PageFlipPending;
 } egl_display;
 
 typedef struct {
