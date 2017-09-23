@@ -27,7 +27,7 @@ void EnableGLDebug();
 int NextPowerOfTwo(int x);
 
 #define NEWTIME(name) float __##name##Before = GetTime();
-#define ENDTIME(name) printf("%20s Took: %.2fms\n", #name, (GetTime() - __##name##Before) * 1000);
+#define ENDTIME(name) printf("%20s took: %.2fms\n", #name, (GetTime() - __##name##Before) * 1000);
 #define GRAPHTIME(name, sym) printf("%20s", #name); Graph(sym, (GetTime() - __##name##Before) * 1000);
 
 void Graph(char* sym, int N);

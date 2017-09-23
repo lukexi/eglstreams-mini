@@ -445,13 +445,13 @@ void EGLStreamAcquire(egl_display* Display) {
 
 void EGLSwapDisplay(egl_display* Display) {
 
-    NEWTIME(egl);
+    NEWTIME(eglSwapBuffers);
     eglSwapBuffers(Display->DisplayDevice, Display->Surface);
-    ENDTIME(egl);
+    ENDTIME(eglSwapBuffers);
 
-    NEWTIME(acquire);
+    NEWTIME(StreamAcquire);
     EGLStreamAcquire(Display);
-    ENDTIME(acquire);
+    ENDTIME(StreamAcquire);
 
     Display->PageFlipPending = true;
 }
@@ -593,9 +593,17 @@ static void PageFlipEventHandler(int fd, unsigned int frame,
                     void *data)
 {
     egl_display* Display = (egl_display*)data;
-    printf("PAGEFLIP %s\n", Display->EDID->MonitorName);
     (void)fd; (void)frame; (void)sec; (void)usec; (void)data;
     Display->PageFlipPending = false;
+
+    float Now = GetTime();
+    if (Display->LastPageFlip > 0) {
+        printf("%20s page flip interval: %.2fms\n",
+            Display->EDID->MonitorName,
+            (Now - Display->LastPageFlip) * 1000);
+    }
+
+    Display->LastPageFlip = Now;
 }
 
 egl_state* SetupEGL() {

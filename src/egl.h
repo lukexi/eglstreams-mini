@@ -39,6 +39,7 @@ typedef struct {
     EGLConfig Config;
     EGLStreamKHR Stream;
     bool PageFlipPending;
+    float LastPageFlip;
 } egl_display;
 
 typedef struct {
