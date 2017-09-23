@@ -39,7 +39,7 @@ int main() {
         for (int DisplayIndex = 0; DisplayIndex < EGL->DisplaysCount; DisplayIndex++) {
             egl_display* Display = &EGL->Displays[DisplayIndex];
 
-            if (!Display->VSyncReady) {
+            if (Display->PageFlipPending) {
                 continue;
             }
 

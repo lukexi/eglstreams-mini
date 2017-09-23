@@ -453,7 +453,7 @@ void EGLSwapDisplay(egl_display* Display) {
     EGLStreamAcquire(Display);
     ENDTIME(acquire);
 
-    Display->VSyncReady = false;
+    Display->PageFlipPending = true;
 }
 
 /*
@@ -556,15 +556,15 @@ egl_display* SetupEGLDisplays(
          * Make current to the EGLSurface, so that OpenGL rendering is
          * directed to it.
          */
-        Displays[PlaneIndex].EDID          = Plane->EDID;
-        Displays[PlaneIndex].Width         = Plane->Width;
-        Displays[PlaneIndex].Height        = Plane->Height;
-        Displays[PlaneIndex].DisplayDevice = eglDpy;
-        Displays[PlaneIndex].Surface       = eglSurface;
-        Displays[PlaneIndex].Context       = eglContext;
-        Displays[PlaneIndex].Config        = eglConfig;
-        Displays[PlaneIndex].Stream        = eglStream;
-        Displays[PlaneIndex].VSyncReady    = true;
+        Displays[PlaneIndex].EDID            = Plane->EDID;
+        Displays[PlaneIndex].Width           = Plane->Width;
+        Displays[PlaneIndex].Height          = Plane->Height;
+        Displays[PlaneIndex].DisplayDevice   = eglDpy;
+        Displays[PlaneIndex].Surface         = eglSurface;
+        Displays[PlaneIndex].Context         = eglContext;
+        Displays[PlaneIndex].Config          = eglConfig;
+        Displays[PlaneIndex].Stream          = eglStream;
+        Displays[PlaneIndex].PageFlipPending = false;
     }
 
 
@@ -595,7 +595,7 @@ static void PageFlipEventHandler(int fd, unsigned int frame,
     egl_display* Display = (egl_display*)data;
     printf("PAGEFLIP %s\n", Display->EDID->MonitorName);
     (void)fd; (void)frame; (void)sec; (void)usec; (void)data;
-    Display->VSyncReady = true;
+    Display->PageFlipPending = false;
 }
 
 egl_state* SetupEGL() {
