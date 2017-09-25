@@ -115,6 +115,7 @@ PFNEGLQUERYSTREAMKHRPROC pEglQueryStreamKHR = NULL;
 PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC pEglStreamConsumerAcquireAttribNV = NULL;
 PFNEGLSTREAMCONSUMERRELEASEATTRIBNVPROC pEglStreamConsumerReleaseAttribNV = NULL;
 PFNEGLCREATESTREAMATTRIBNVPROC pEglCreateStreamAttribNV = NULL;
+PFNEGLOUTPUTLAYERATTRIBEXTPROC pEglOutputLayerAttribEXT = NULL;
 
 void GetEglExtensionFunctionPointers(void)
 {
@@ -150,6 +151,9 @@ void GetEglExtensionFunctionPointers(void)
 
     pEglCreateStreamAttribNV = (PFNEGLCREATESTREAMATTRIBNVPROC)
         GetProcAddress("eglCreateStreamAttribNV");
+
+    pEglOutputLayerAttribEXT = (PFNEGLOUTPUTLAYERATTRIBEXTPROC)
+        GetProcAddress("eglOutputLayerAttribEXT");
 }
 
 
@@ -501,6 +505,13 @@ egl_display* SetupEGLDisplays(
             Fatal("Unable to get EGLOutputLayer for plane 0x%08x\n", Plane->PlaneID);
         }
 
+        /* Set the OutputLayer's swap interval */
+        pEglOutputLayerAttribEXT(eglDpy, eglLayer,
+            EGL_SWAP_INTERVAL_EXT, 0);
+        if (!ret) {
+            Fatal("Unable to set EGLOutputLayer's swap interval\n");
+        }
+
         /* Create an EGLStream. */
         EGLStreamKHR eglStream = pEglCreateStreamAttribNV(eglDpy, streamAttribs);
 
@@ -582,6 +593,7 @@ void InitGLEW() {
         printf("GLEW returned error: %i\n", GLEWError);
     }
 }
+
 // static void VBlankEventHandler(int fd, unsigned int frame,
 //                     unsigned int sec, unsigned int usec,
 //                     void *data) {
