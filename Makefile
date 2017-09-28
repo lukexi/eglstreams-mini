@@ -15,7 +15,7 @@ CFLAGS += -g
 # Needed for creating .so files
 CFLAGS += -fPIC
 # Needed for Linux's "perf" to work correctly
-# CFLAGS += -fno-omit-frame-pointer
+CFLAGS += -fno-omit-frame-pointer
 
 MAINS = $(wildcard ./*.c)
 APPS = $(MAINS:./%.c=./%.app)
