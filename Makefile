@@ -1,5 +1,5 @@
 INCLUDE_DIRS = -I/usr/include/libdrm -Isrc
-LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm
+LIBS         = -lEGL -lOpenGL -ldrm -lGLEW -lm -pthread
 
 SHADERS += $(wildcard shaders/*)
 SOURCES += $(wildcard src/*.c)

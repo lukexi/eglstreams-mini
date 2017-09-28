@@ -92,10 +92,10 @@ egl_display* SetupEGLDisplays(
 void InitGLEW();
 
 void GetEglExtensionFunctionPointers(void);
-
 void EGLCheck(const char* name);
+EGLint EGLQueryStreamState(EGLDisplay eglDpy, EGLStreamKHR eglStream);
 const char* EGLStreamStateToString(EGLint streamState);
-
+void EGLStreamAcquire(egl_display* Display);
 void EGLUpdateVSync(egl_state* EGL);
 void EGLSwapDisplay(egl_display* Display);
 
