@@ -33,6 +33,8 @@ typedef struct {
     drm_edid* EDID;
     int Width;
     int Height;
+    char* MonitorName;
+    char* SerialNumber;
     EGLSurface Surface;
     EGLContext Context;
     EGLDisplay DisplayDevice;

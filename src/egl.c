@@ -516,6 +516,7 @@ egl_display* SetupEGLDisplays(
         EGLStreamKHR eglStream = pEglCreateStreamAttribNV(eglDpy, streamAttribs);
 
         if (eglStream == EGL_NO_STREAM_KHR) {
+            EGLCheck("eglCreateStreamAttribNV");
             Fatal("Unable to create stream.\n");
         }
 
@@ -570,6 +571,8 @@ egl_display* SetupEGLDisplays(
         Displays[PlaneIndex].EDID            = Plane->EDID;
         Displays[PlaneIndex].Width           = Plane->Width;
         Displays[PlaneIndex].Height          = Plane->Height;
+        Displays[PlaneIndex].MonitorName     = strdup(Plane->EDID->MonitorName);
+        Displays[PlaneIndex].SerialNumber    = strdup(Plane->EDID->SerialNumber);
         Displays[PlaneIndex].DisplayDevice   = eglDpy;
         Displays[PlaneIndex].Surface         = eglSurface;
         Displays[PlaneIndex].Context         = eglContext;

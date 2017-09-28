@@ -13,7 +13,7 @@
 #define CLAMP(l,h,a) (MAX(l, MIN(h, a)))
 
 void Fatal(const char *format, ...);
-float GetTime(void);
+float GetTime();
 
 void GLCheck(const char* name);
 

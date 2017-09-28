@@ -29,7 +29,7 @@ void Graph(char* sym, int N) {
     printf("\n");
 }
 
-float GetTime(void)
+float GetTime()
 {
     static struct timeval InitialTime = {0, 0};
     if (InitialTime.tv_sec == 0)
