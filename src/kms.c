@@ -225,14 +225,14 @@ static bool PickConnector(int drmFd,
                    edid->SerialNumber);
         }
 
-        for (int ModeIndex = 0; ModeIndex < pConnector->count_modes; ModeIndex++) {
-            printf("Mode %i info: %s clock %i vrefresh %i \n",
-                ModeIndex,
-                pConnector->modes[ModeIndex].name,
-                pConnector->modes[ModeIndex].clock,
-                pConnector->modes[ModeIndex].vrefresh
-            );
-        }
+        // for (int ModeIndex = 0; ModeIndex < pConnector->count_modes; ModeIndex++) {
+        //     printf("Mode %i info: %s clock %i vrefresh %i \n",
+        //         ModeIndex,
+        //         pConnector->modes[ModeIndex].name,
+        //         pConnector->modes[ModeIndex].clock,
+        //         pConnector->modes[ModeIndex].vrefresh
+        //     );
+        // }
 
 
 

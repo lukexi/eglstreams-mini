@@ -445,6 +445,7 @@ void EGLStreamAcquire(egl_display* Display) {
     if (Result == EGL_FALSE) {
         EGLCheck("eglStreamConsumerAcquireAttribNV");
     }
+    Display->PageFlipPending = true;
 }
 
 void EGLSwapDisplay(egl_display* Display) {
@@ -457,7 +458,7 @@ void EGLSwapDisplay(egl_display* Display) {
     EGLStreamAcquire(Display);
     ENDTIME(StreamAcquire);
 
-    Display->PageFlipPending = true;
+
 }
 
 /*
@@ -484,7 +485,7 @@ egl_display* SetupEGLDisplays(
         printf("Setting up plane ID: %i\n", Plane->PlaneID);
 
         EGLAttrib streamAttribs[] = {
-            EGL_STREAM_FIFO_LENGTH_KHR, 1,
+            EGL_STREAM_FIFO_LENGTH_KHR, 10,
             EGL_CONSUMER_AUTO_ACQUIRE_EXT, EGL_FALSE,
             EGL_CONSUMER_ACQUIRE_TIMEOUT_USEC_KHR, 0,
             EGL_NONE,
@@ -665,6 +666,17 @@ egl_state* SetupEGL() {
 
     return EGL;
 }
+
+EGLint EGLQueryStreamState(EGLDisplay eglDpy, EGLStreamKHR eglStream) {
+     EGLint streamState;
+     EGLBoolean r = pEglQueryStreamKHR(eglDpy, eglStream, EGL_STREAM_STATE_KHR, &streamState);
+     if (r == EGL_FALSE) {
+         EGLCheck("Query Stream");
+     }
+
+     return streamState;
+ }
+
 
 const char* EGLStreamStateToString(EGLint StreamState) {
     switch (StreamState) {
