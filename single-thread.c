@@ -48,11 +48,12 @@ int main() {
                 Display->Surface, Display->Surface,
                 Display->Context);
 
+            PrintDisplayLayerSwapInterval(Display);
+
             glViewport(0, 0,
                 (GLint)Display->Width,
                 (GLint)Display->Height);
 
-            // glClearColor(1, 1, 1, 1);
             glClearColor(
                         (sin(GetTime()*3)/2+0.5) * 0.8,
                         (sin(GetTime()*5)/2+0.5) * 0.8,

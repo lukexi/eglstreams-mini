@@ -116,6 +116,7 @@ PFNEGLSTREAMCONSUMERACQUIREATTRIBNVPROC pEglStreamConsumerAcquireAttribNV = NULL
 PFNEGLSTREAMCONSUMERRELEASEATTRIBNVPROC pEglStreamConsumerReleaseAttribNV = NULL;
 PFNEGLCREATESTREAMATTRIBNVPROC pEglCreateStreamAttribNV = NULL;
 PFNEGLOUTPUTLAYERATTRIBEXTPROC pEglOutputLayerAttribEXT = NULL;
+PFNEGLQUERYOUTPUTLAYERATTRIBEXTPROC pEglQueryOutputLayerAttribEXT = NULL;
 
 void GetEglExtensionFunctionPointers(void)
 {
@@ -154,6 +155,9 @@ void GetEglExtensionFunctionPointers(void)
 
     pEglOutputLayerAttribEXT = (PFNEGLOUTPUTLAYERATTRIBEXTPROC)
         GetProcAddress("eglOutputLayerAttribEXT");
+
+    pEglQueryOutputLayerAttribEXT = (PFNEGLQUERYOUTPUTLAYERATTRIBEXTPROC)
+        GetProcAddress("eglQueryOutputLayerAttribEXT");
 }
 
 
@@ -426,6 +430,15 @@ EGLContext GetEglContext(EGLDisplay eglDpy, EGLConfig eglConfig) {
     return eglContext;
 }
 
+void PrintDisplayLayerSwapInterval(egl_display* Display) {
+    EGLAttrib SwapInterval;
+    pEglQueryOutputLayerAttribEXT(Display->DisplayDevice, Display->Layer,
+        EGL_SWAP_INTERVAL_EXT, &SwapInterval);
+    printf("Swap interval for %s is %li\n",
+        Display->MonitorName,
+        SwapInterval);
+}
+
 void EGLUpdateVSync(egl_state* EGL) {
     drmHandleEvent(EGL->DRMFD, &EGL->DRMEventContext);
 }
@@ -485,7 +498,7 @@ egl_display* SetupEGLDisplays(
         printf("Setting up plane ID: %i\n", Plane->PlaneID);
 
         EGLAttrib streamAttribs[] = {
-            EGL_STREAM_FIFO_LENGTH_KHR, 10,
+            EGL_STREAM_FIFO_LENGTH_KHR, 0,
             EGL_CONSUMER_AUTO_ACQUIRE_EXT, EGL_FALSE,
             EGL_CONSUMER_ACQUIRE_TIMEOUT_USEC_KHR, 0,
             EGL_NONE,
@@ -579,6 +592,7 @@ egl_display* SetupEGLDisplays(
         Displays[PlaneIndex].Context         = eglContext;
         Displays[PlaneIndex].Config          = eglConfig;
         Displays[PlaneIndex].Stream          = eglStream;
+        Displays[PlaneIndex].Layer           = eglLayer;
         Displays[PlaneIndex].PageFlipPending = false;
     }
 

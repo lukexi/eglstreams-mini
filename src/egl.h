@@ -40,6 +40,7 @@ typedef struct {
     EGLDisplay DisplayDevice;
     EGLConfig Config;
     EGLStreamKHR Stream;
+    EGLOutputLayerEXT Layer;
     bool PageFlipPending;
     float LastPageFlip;
 } egl_display;
@@ -91,6 +92,7 @@ egl_display* SetupEGLDisplays(
 
 void InitGLEW();
 
+void PrintDisplayLayerSwapInterval();
 void GetEglExtensionFunctionPointers(void);
 void EGLCheck(const char* name);
 EGLint EGLQueryStreamState(EGLDisplay eglDpy, EGLStreamKHR eglStream);
